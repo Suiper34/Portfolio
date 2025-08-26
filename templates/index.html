@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block header %}
+{% include 'header.html' %}
+{% endblock %}
+
+{% block content %}
+<!-- Video Modal Start -->
+<div class="modal modal-video fade" id="videoModal" tabindex="-1" aria-labelledby="exampleModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content rounded-0">
+            <div class="modal-header">
+                <h3 class="modal-title" id="exampleModalLabel">Youtube Video</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ratio ratio-16x9">
+                    <iframe class="embed-responsive-item" src="" id="video" allowfullscreen allowscriptaccess="always"
+                        allow="autoplay"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Video Modal End -->
+
+
+<!-- Team Start -->
+<div class="container-xxl py-6 pb-5" id="team">
+    <div class="container">
+        <div class="row g-4"></div>
+        {% if not team_members or team_members is None %}
+        <div class="col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="0.1s">
+            <div class="team-item position-relative">
+                <div class="team-text bg-white rounded-end p-4">
+                    <div>
+                        <h5>No Team Members Yet...Currently Work Alone</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="row g-5 mb-5 wow fadeInUp" data-wow-delay="0.1s">
+            <div class="col-lg-6">
+                <h1 class="display-5 mb-0">Team Members</h1>
+            </div>
+            <div class="col-lg-6 text-lg-end">
+                <a class="btn btn-primary py-3 px-5" href="{{ whatsapp }}">Contact Us</a>
+            </div>
+        </div>
+        <div class="row g-4">
+            {% for member in team_members %}
+            <div class="col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="0.1s">
+                <div class="team-item position-relative">
+                    <img class="img-fluid rounded" src="{{ url_for('static', filename='img/team-1.jpg') }}" alt="">
+                    <div class="team-text bg-white rounded-end p-4">
+                        <div>
+                            <h5>{{ member.member_name }}</h5>
+                            <span>{{ member.role }}</span>
+                            <br>
+                            {% if member.portfolio_link %}
+                            <a class="btn btn-tertiary py-3 px-5" href="{{ member.portfolio_link }}">Link to
+                                Porfolio</a>
+                            {% endif %}
+                            <br>
+                            {% if member.github_link %}
+                            <a class="btn btn-tertiary py-3 px-5" href="{{ member.github_link }}">GitHub</a>
+                            {% endif %}
+                        </div>
+                        <i class="fa fa-arrow-right fa-2x text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+<!-- Team End -->
+
+
+<!-- Testimonial Start -->
+<div class="container-fluid bg-light py-5 my-5" id="testimonial">
+    <div class="container-fluid py-5">
+        <h1 class="display-5 text-center mb-5 wow fadeInUp" data-wow-delay="0.1s">Testimonial</h1>
+        <div class="row justify-content-center">
+            {% if not clients or clients is None %}
+            <div class="col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="0.1s">
+                <div class="team-item position-relative">
+                    <div class="team-text bg-white rounded-end p-4">
+                        <div>
+                            <h5>No Team Members Yet...Currently Work Alone</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            {% for client in clients %}
+            <div class="col-lg-3 d-none d-lg-block">
+                <div class="testimonial-left h-100">
+                    <img class="img-fluid wow fadeIn" data-wow-delay="0.2s"
+                        src="{{ url_for('static', filename='files/client.client_img') }}" alt="">
+                </div>
+            </div>
+            <div class="col-lg-6 wow fadeInUp" data-wow-delay="0.5s">
+                <div class="owl-carousel testimonial-carousel">
+                    <div class="testimonial-item text-center">
+                        <div class="position-relative mb-5">
+                            <img class="img-fluid rounded-circle border border-secondary p-2 mx-auto"
+                                src="{{ url_for('static', filename='files/client.client_img') }}" alt="">
+                            <div class="testimonial-icon">
+                                <i class="fa fa-quote-left text-primary"></i>
+                            </div>
+                        </div>
+                        <p class="fs-5 fst-italic">Suip</p>
+                        <hr class="w-25 mx-auto">
+                        <h5>{{ client.client_name }}</h5>
+                        <span>{{ client.profession }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 d-none d-lg-block">
+                <div class="testimonial-right h-100">
+                    <img class="img-fluid wow fadeIn" data-wow-delay="0.2s"
+                        src="{{ url_for('static', filename='files/client.client_img') }}" alt="">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+</div>
+<!-- Testimonial End -->
+
+{% include 'map.html' %}
+
+{% endblock %}

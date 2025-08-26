@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %} Sign Up {% endblock %}
+
+{% block header %}
+<!-- Header -->
+<div class="container-fluid bg-light my-6 mt-0" id="home">
+  <div class="container">
+    <div class="row g-5 align-items-center">
+      <div class="col-lg-6 py-6 pb-0 pt-lg-0">
+        <h3 class="text-primary mb-3">I'm</h3>
+        <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
+        <h2 class="typed-text-output d-inline"></h2>
+        <div class="typed-text d-none">A Data Scientist, A Web Application Developer, A Backend Engineer, A Mobile
+          Application
+          Developer, UI/UX
+          Designer, An AI Engineer
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header min-vh-100">
+  <div class="container">
+    <div class="row">
+      <div
+        class="col-6 d-lg-flex d-none h-100 my-auto pe-0 position-absolute top-0 start-0 text-center justify-content-center flex-column">
+        <div
+          class="position-relative bg-gradient-primary h-100 m-3 px-7 border-radius-lg d-flex flex-column justify-content-center"
+          style="background-image: url('{{ url_for('static', filename='img/signup.jpg') }}'); background-size: cover;">
+        </div>
+      </div>
+      <div class="col-xl-4 col-lg-5 col-md-7 d-flex flex-column ms-auto me-auto ms-lg-auto me-lg-5">
+        <div class="card card-plain">
+          <div class="card-header">
+            <h4 class="font-weight-bolder">
+              Sign Up
+            </h4>
+            <p class="mb-0">
+              {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+            <ul class=flashes>
+              {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+            {% endwith %}
+            </p>
+          </div>
+
+          <div class="card-body">
+            <form role="form" method="post" action="">
+
+              {{ form.csrf_token }}
+              {{ form.hidden_tag() }}
+
+              <div class="input-group input-group-outline mb-3">
+                {{ form.name(class="form-control", placeholder="Full name") }}
+              </div>
+              <div class="input-group input-group-outline mb-3">
+                {{ form.username(class="form-control", placeholder="Username") }}
+              </div>
+              <div class="input-group input-group-outline mb-3">
+                {{ form.email(class="form-control", placeholder="Email") }}
+              </div>
+              <div class="input-group input-group-outline mb-3">
+                {{ form.password(class="form-control", placeholder="New password (min 8, best practice: include
+                symbols and number)") }}
+              </div>
+              <div class="input-group input-group-outline mb-3">
+                {{ form.confirm_password(class="form-control", placeholder="Confirm password") }}
+              </div>
+              <div class="text-center">
+                {{ form.signup(class="btn btn-lg bg-gradient-primary btn-lg w-100 mt-4 mb-0") }}
+              </div>
+            </form>
+          </div>
+          <div class="card-footer text-center pt-0 px-lg-2 px-1">
+            <p class="mb-2 text-sm mx-auto">
+              Already have an account?
+              <a href="{{ url_for('login') }}" class="text-primary text-gradient font-weight-bold">Login</a>
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}

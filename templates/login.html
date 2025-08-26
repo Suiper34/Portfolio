@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %} Login {% endblock %}
+
+{% block header %}
+<!-- Header -->
+<div class="container-fluid bg-light my-6 mt-0" id="home">
+  <div class="container">
+    <div class="row g-5 align-items-center">
+      <div class="col-lg-6 py-6 pb-0 pt-lg-0">
+        <h3 class="text-primary mb-3">I'm</h3>
+        <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
+        <h2 class="typed-text-output d-inline"></h2>
+        <div class="typed-text d-none">Data Scientist, Web Application Developer, Backend Engineer, Mobile
+          Application
+          Developer, UI/UX
+          Designer, AI Engineer
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header align-items-start min-vh-100"
+  style="background-image: url('{{ url_for('static', filename='img/login.jpg') }}'); background-size: cover;">
+  <span class="mask bg-gradient-dark opacity-6"></span>
+  <div class="container my-auto">
+    <div class="row">
+      <div class="col-lg-4 col-md-8 col-12 mx-auto">
+        <div class="card z-index-0 fadeIn3 fadeInBottom">
+          <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+            <div class="bg-gradient-primary shadow-primary border-radius-lg py-3 pe-1">
+              <h4 class="text-white font-weight-bolder text-center mt-2 mb-0">
+                SuipJhaps Dashboard
+              </h4>
+              <div class="row mt-3">
+                <p class="mb-0 text-white text-center">
+                  {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                <ul class=flashes>
+                  {% for category, message in messages %}
+                  <li class="{{ category }}">{{ message }}</li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+                {% endwith %}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+
+            <form role="form" method="post" action="" class="text-start">
+
+              {{ form.csrf_token }}
+
+              {{ form.hidden_tag() }}
+
+              <div class="input-group input-group-outline mb-3">
+                {{ form.name_or_email(class="form-control", placeholder="Enter your username or email") }}
+              </div>
+              <div class="input-group input-group-outline mb-3">
+                {{ form.password(class="form-control", type="password", placeholder="Password") }}
+              </div>
+              <div class="form-check form-switch d-flex align-items-center mb-3">
+                <input class="form-check-input" type="checkbox" id="rememberMe">
+                <label class="form-check-label mb-0 ms-2" for="rememberMe">Remember me</label>
+              </div>
+              <div class="text-center">
+                {{ form.login(class="btn bg-gradient-primary w-100 my-4 mb-2") }}
+              </div>
+              <p class="mt-4 text-sm text-center">
+                Don't have an account?
+                <a href="{{ url_for('signup') }}" class="text-primary text-gradient font-weight-bold">Sign Up</a>
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
