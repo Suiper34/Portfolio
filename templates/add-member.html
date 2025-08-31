@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Add / Update Team Member{% endblock %}
+
+{% block header %}
+<!-- Header -->
+<div class="container-fluid bg-light my-6 mt-0" id="home">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-6 py-6 pb-0 pt-lg-0">
+                <h3 class="text-primary mb-3">I'm</h3>
+                <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
+                <h2 class="typed-text-output d-inline"></h2>
+                <div class="typed-text d-none">Data Scientist, Web Application Developer, Backend Engineer, Mobile
+                    Application
+                    Developer, UI/UX
+                    Designer, AI Engineer
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    {% include 'flash_msg.html' %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Add / Update Team Member</h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {{ form.csrf_token }}
+                <div class="mb-3">
+                    <label class="form-label">Member Name</label>
+                    {{ form.member_name(class="form-control", placeholder="Full name") }}
+                    {% if form.member_name.errors %}
+                    <div class="text-danger small">{{ form.member_name.errors[0] }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Role</label>
+                    {{ form.role(class="form-control", placeholder="Role in team") }}
+                    {% if form.role.errors %}
+                    <div class="text-danger small">{{ form.role.errors[0] }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Portfolio Link</label>
+                    {{ form.portfolio_link(class="form-control", placeholder="https://...") }}
+                    {% if form.portfolio_link.errors %}
+                    <div class="text-danger small">{{ form.portfolio_link.errors[0] }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Github Profile</label>
+                    {{ form.github_link(class="form-control", placeholder="https://github.com/username") }}
+                    {% if form.github_link.errors %}
+                    <div class="text-danger small">{{ form.github_link.errors[0] }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="text-end">
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary ms-2">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

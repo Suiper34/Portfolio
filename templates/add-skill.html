@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Add / Update Skill{% endblock %}
+
+{% block header %}
+<!-- Header -->
+<div class="container-fluid bg-light my-6 mt-0" id="home">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-6 py-6 pb-0 pt-lg-0">
+                <h3 class="text-primary mb-3">I'm</h3>
+                <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
+                <h2 class="typed-text-output d-inline"></h2>
+                <div class="typed-text d-none">Data Scientist, Web Application Developer, Backend Engineer, Mobile
+                    Application
+                    Developer, UI/UX
+                    Designer, AI Engineer
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    {% include 'flash_msg.html' %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Add / Update Skill</h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {{ form.csrf_token }}
+                <div class="mb-3">
+                    <label class="form-label">Skill</label>
+                    {{ form.skill_name(class="form-control", placeholder="e.g. Python") }}
+                    {% if form.skill_name.errors %}
+                    <div class="text-danger small">{{ form.skill_name.errors[0] }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Proficiency (%)</label>
+                    {{ form.proficiency(class="form-control", placeholder="1 - 100") }}
+                    {% if form.proficiency.errors %}
+                    <div class="text-danger small">{{ form.proficiency.errors[0] }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="text-end">
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary ms-2">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

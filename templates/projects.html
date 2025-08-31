@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}JhapTech Projects{% endblock %}
+
+{% block header %}
+<!-- Header -->
+<div class="container-fluid bg-light my-6 mt-0" id="home">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-6 py-6 pb-0 pt-lg-0">
+                <h3 class="text-primary mb-3">I'm</h3>
+                <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
+                <h2 class="typed-text-output d-inline"></h2>
+                <div class="typed-text d-none">Data Scientist, Web Application Developer, Backend Engineer, Mobile
+                    Application Developer, UI/UX Designer, AI Engineer
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-xxl py-6 pt-5" id="project">
+    <div class="container">
+        <div class="row mb-4 align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-5 mb-0">My Projects</h1>
+            </div>
+            <div class="col-lg-6 text-lg-end">
+                <ul class="list-inline mx-n3 mb-0" id="portfolio-flters">
+                    <li class="mx-3 active" data-filter="*">All Projects</li>
+                    <li class="mx-3" data-filter=".web">Web Apps</li>
+                    <li class="mx-3" data-filter=".mobile">Mobile Apps</li>
+                    <li class="mx-3" data-filter=".data">Data Science</li>
+                    <li class="mx-3" data-filter=".uiux">UI/UX Design</li>
+                    <li class="mx-3" data-filter=".graphic">Graphic Design</li>
+                    <li class="mx-3" data-filter=".desktop">Desktop Apps</li>
+                    <li class="mx-3" data-filter=".game">Games</li>
+                    <li class="mx-3" data-filter=".video">Video Edits</li>
+                </ul>
+            </div>
+        </div>
+
+        {% if all_projects %}
+        <div class="row g-4 portfolio-container">
+            {% for project in all_projects %}
+            {% set cat_class = (
+            'web' if project.category and 'Web' in project.category else
+            ('mobile' if project.category and 'Mobile' in project.category else
+            ('data' if project.category and 'Data' in project.category else
+            ('uiux' if project.category and 'UI' in project.category else
+            ('graphic' if project.category and 'Graphic' in project.category else
+            ('desktop' if project.category and 'Desktop' in project.category else
+            ('game' if project.category and 'Game' in project.category else 'video')))))))
+            %}
+            <div class="col-lg-4 col-md-6 portfolio-item {{ cat_class }}">
+                <div class="card h-100">
+                    <div class="ratio ratio-16x9">
+                        {% set img_name = project.image or 'default_project_pic.jpg' %}
+                        <img src="{{ url_for('static', filename='files/' ~ img_name) }}"
+                            class="card-img-top object-fit-cover" alt="{{ project.title or 'Project' }}">
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title mb-1">{{ project.title or 'Untitled' }}</h5>
+                        <small class="text-muted mb-2">{{ project.category or 'Unspecified' }}</small>
+
+                        {% if project.description %}
+                        <p class="card-text small text-truncate-3 mb-2">{{ project.description }}</p>
+                        {% endif %}
+
+                        <ul class="list-unstyled small text-muted mb-3">
+                            {% if project.tech_stack %}<li><strong>Tech:</strong> {{ project.tech_stack }}</li>{% endif
+                            %}
+                            {% if project.platform %}<li><strong>Platform:</strong> {{ project.platform }}</li>{% endif
+                            %}
+                            {% if project.apk_size %}<li><strong>Size:</strong> {{ project.apk_size }}</li>{% endif %}
+                            <li><strong>Stars:</strong> {{ project.github_stars or 0 }}</li>
+                            <li><strong>Created:</strong> {{ project.created_at.strftime('%Y-%m-%d') if
+                                project.created_at else '—' }}</li>
+                        </ul>
+
+                        <div class="mt-auto d-flex gap-2">
+                            {% if project.demo_url %}
+                            <a href="{{ project.demo_url }}" target="_blank" rel="noopener"
+                                class="btn btn-sm btn-primary">Live Demo</a>
+                            {% endif %}
+                            {% if project.github_url %}
+                            <a href="{{ project.github_url }}" target="_blank" rel="noopener"
+                                class="btn btn-sm btn-outline-dark">GitHub</a>
+                            {% endif %}
+                            {% if project.file_name %}
+                            <a href="{{ url_for('download_cv', cv=project.file_name) }}"
+                                class="btn btn-sm btn-outline-secondary">Download</a>
+                            {% endif %}
+                            {% if project.figma_canva_url %}
+                            <a href="{{ project.figma_canva_url }}" target="_blank" rel="noopener"
+                                class="btn btn-sm btn-outline-info">Figma/Canva</a>
+                            {% endif %}
+                            {% if project.responsive %}
+                            <span class="badge bg-success align-self-center">Responsive</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">No projects available!</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}Users Management{% endblock %}
+
+{% block header %}
+<!-- Header -->
+<div class="container-fluid bg-light my-6 mt-0" id="home">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-6 py-6 pb-0 pt-lg-0">
+                <h3 class="text-primary mb-3">I'm</h3>
+                <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
+                <h2 class="typed-text-output d-inline"></h2>
+                <div class="typed-text d-none">Data Scientist, Web Application Developer, Backend Engineer, Mobile
+                    Application
+                    Developer, UI/UX
+                    Designer, AI Engineer
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div class="container my-4">
+    {% include 'flash_msg.html' %}
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Users Management</h5> <a class="btn btn-light btn-sm"
+                href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+        </div>
+        <div class="card-body">
+            {% if users %}
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Is Admin</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ 'Yes' if user.is_admin else 'No' }}</td>
+                        <td> {% if not user.is_admin %}
+                            <form method="post" action="{{ url_for('promote_user',user_id=user.id) }}"
+                                style="display:inline">
+                                {{ csrf_token() }}
+                                <button type="submit" class="btn btn-sm btn-primary">Promote to Admin</button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted">No users available.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

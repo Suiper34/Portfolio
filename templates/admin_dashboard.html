@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block header %}
+<!-- Header -->
+<div class="container-fluid bg-light my-6 mt-0" id="home">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-6 py-6 pb-0 pt-lg-0">
+                <h3 class="text-primary mb-3">I'm</h3>
+                <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
+                <h2 class="typed-text-output d-inline"></h2>
+                <div class="typed-text d-none">Data Scientist, Web Application Developer, Backend Engineer, Mobile
+                    Application
+                    Developer, UI/UX
+                    Designer, AI Engineer
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row g-4">
+        <!-- Left column: Quick actions -->
+        <div class="col-lg-3">
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    Quick Actions
+                </div>
+                <div class="card-body">
+                    <p><a class="btn btn-outline-light w-100 mb-2 text-dark" href="{{ url_for('add_project') }}">Add
+                            Project</a>
+                    </p>
+                    <p><a class="btn btn-outline-light w-100 mb-2 text-dark" href="{{ url_for('add_member') }}">Add Team
+                            Member</a></p>
+                    <p><a class="btn btn-outline-light w-100 mb-2 text-dark" href="{{ url_for('add_client') }}">Add
+                            Client</a></p>
+                    <p><a class="btn btn-outline-light w-100 mb-2 text-dark" href="{{ url_for('add_skill') }}">Add
+                            Skill</a></p>
+                    <p><a class="btn btn-outline-light w-100 mb-2 text-dark" href="{{ url_for('add_experience') }}">Add
+                            Experience</a></p>
+                    <p><a class="btn btn-outline-light w-100 text-dark" href="{{ url_for('manage_users') }}">Manage
+                            Users</a></p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    Summary
+                </div>
+                <div class="card-body">
+                    <p>Projects: {{ projects|length if projects is defined else '—' }}</p>
+                    <p>Team: {{ team_members|length if team_members is defined else '—' }}</p>
+                    <p>Clients: {{ clients|length if clients is defined else '—' }}</p>
+                    <p>Skills: {{ skills|length if skills is defined else '—' }}</p>
+                    <p>Experience: {{ experiences|length if experiences is defined else '—' }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right column: CRUD panels -->
+        <div class="col-lg-9">
+            <!-- Projects -->
+            <section class="mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Projects</h5>
+                        <a class="btn btn-light btn-sm" href="{{ url_for('add_project') }}">Add</a>
+                    </div>
+                    <div class="card-body">
+                        {% if projects %}
+                        <ul class="list-group">
+                            {% for project in projects %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ project.title }}</strong>
+                                    <small class="text-muted">({{ project.category}})</small><br>
+                                    <small>{{ project.description[:120] if project.description else '' }}</small>
+                                </div>
+                                <div class="btn-group">
+                                    <a class="btn btn-outline-primary btn-sm"
+                                        href="{{ url_for('update_project', project_id=project.id) }}">Edit</a>
+                                    <a class="btn btn-outline-danger btn-sm"
+                                        href="{{ url_for('delete_project', project_id=project.id) }}"
+                                        onclick="return confirm('Delete project?')">Delete</a>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted">No project added yet!</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Team -->
+            <section class="mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Team</h5>
+                        <a class="btn btn-light btn-sm" href="{{ url_for('add_member') }}">Add</a>
+                    </div>
+                    <div class="card-body">
+                        {% if team_members %}
+                        <ul class="list-group">
+                            {% for member in team_members %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ member.member_name }}</strong>
+                                    <small class="text-muted">— {{ member.role }}</small><br>
+                                    <small class="text-muted">{{ member.portfolio_link }}</small><br>
+                                    <small class="text-muted">{{ member.github_link }}</small>
+                                </div>
+                                <div class="btn-group">
+                                    <a class="btn btn-outline-primary btn-sm"
+                                        href="{{ url_for('update_member_profile', member_id=member.id) }}">Edit</a>
+                                    <a class="btn btn-outline-danger btn-sm"
+                                        href="{{ url_for('delete_member', member_id=member.id) }}"
+                                        onclick="return confirm('Delete member?')">Delete</a>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted">No team members yet!</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Clients -->
+            <section class="mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Clients</h5>
+                        <a class="btn btn-light btn-sm" href="{{ url_for('add_client') }}">Add</a>
+                    </div>
+                    <div class="card-body">
+                        {% if clients %}
+                        <ul class="list-group">
+                            {% for client in clients %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ client.client_name }}</strong><br>
+                                    <small class="text-muted">{{ client.profession }}</small>
+                                </div>
+                                <div class="btn-group">
+                                    <a class="btn btn-outline-primary btn-sm"
+                                        href="{{ url_for('update_client_profile', client_id=client.id) }}">Edit</a>
+                                    <a class="btn btn-outline-danger btn-sm"
+                                        href="{{ url_for('delete_client', client_id=client.id) }}"
+                                        onclick="return confirm('Delete client?')">Delete</a>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted">No clients yet!</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Skills & Experience -->
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between">
+                            <h5 class="mb-0">Skills</h5>
+                            <a class="btn btn-light btn-sm" href="{{ url_for('add_skill') }}">Add</a>
+                        </div>
+                        <div class="card-body">
+                            {% if skills %}
+                            <ul class="list-group">
+                                {% for skill in skills %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ skill.name }}</strong><br>
+                                        <small class="text-muted">{{ skill.proficiency }}%</small>
+                                    </div>
+                                    <div class="btn-group">
+                                        <a class="btn btn-outline-primary btn-sm"
+                                            href="{{ url_for('update_skill', skill_id=skill.id) }}">Edit</a>
+                                        <a class="btn btn-outline-danger btn-sm"
+                                            href="{{ url_for('delete_skill', skill_id=skill.id) }}"
+                                            onclick="return confirm('Delete skill?')">Delete</a>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p class="text-muted">No skill added yet!</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between">
+                            <h5 class="mb-0">Experience</h5>
+                            <a class="btn btn-light btn-sm" href="{{ url_for('add_experience') }}">Add</a>
+                        </div>
+                        <div class="card-body">
+                            {% if experiences %}
+                            <ul class="list-group">
+                                {% for exp in experiences %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ exp.role }}</strong>
+                                        <small class="text-muted">({{ exp.category}})</small><br>
+                                        <small class="text-muted">{{ exp.start_year }} — {{ exp.end_year}}</small>
+                                    </div>
+                                    <div class="btn-group">
+                                        <a class="btn btn-outline-danger btn-sm"
+                                            href="{{ url_for('delete_experience', experience_id=exp.id) }}"
+                                            onclick="return confirm('Delete experience?')">Delete</a>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p class="text-muted">No experiences yet!</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

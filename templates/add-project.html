@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Add / Update Project{% endblock %}
+
+{% block header %}
+<!-- Header -->
+<div class="container-fluid bg-light my-6 mt-0" id="home">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-6 py-6 pb-0 pt-lg-0">
+                <h3 class="text-primary mb-3">I'm</h3>
+                <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
+                <h2 class="typed-text-output d-inline"></h2>
+                <div class="typed-text d-none">Data Scientist, Web Application Developer, Backend Engineer, Mobile
+                    Application
+                    Developer, UI/UX
+                    Designer, AI Engineer
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    {% include 'flash_msg.html' %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Add / Update Project</h5>
+            <small class="text-white-50">Use the fields below to add and upload files</small>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {{ form.csrf_token }}
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Title</label>
+                        {{ form.title(class="form-control", placeholder="Project title") }}
+                        {% if form.title.errors %}
+                        <div class="text-danger small">{{ form.title.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Category</label>
+                        {{ form.category(class="form-control", placeholder="Web, Mobile, Data...") }}
+                        {% if form.category.errors %}
+                        <div class="text-danger small">{{ form.category.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    {{ form.description(class="form-control", rows="4", placeholder="Short description") }}
+                    {% if form.description.errors %}
+                    <div class="text-danger small">{{ form.description.errors[0] }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Demo URL</label>
+                        {{ form.demo_url(class="form-control", placeholder="https://...") }}
+                        {% if form.demo_url.errors %}
+                        <div class="text-danger small">{{ form.demo_url.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">GitHub URL</label>
+                        {{ form.github_url(class="form-control", placeholder="https://github.com/...") }}
+                        {% if form.github_url.errors %}
+                        <div class="text-danger small">{{ form.github_url.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">APK / File size</label>
+                        {{ form.apk_size(class="form-control", placeholder="e.g. 12MB") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Platform</label>
+                        {{ form.platform(class="form-control", placeholder="e.g. Android / iOS / Web") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Current Version</label>
+                        {{ form.current_version(class="form-control", placeholder="v1.0.0") }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Tech Stack</label>
+                    {{ form.tech_stack(class="form-control", placeholder="Python, Flask, React...") }}
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Project Image (jpg, png, jpeg)</label>
+                        {{ form.image(class="form-control") }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Project File (apk, zip, pdf...)</label>
+                        <input type="file" name="file_name" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="form-check mb-3">
+                    {{ form.responsive(class="form-check-input") }}
+                    <label class="form-check-label ms-2">Responsive</label>
+                </div>
+
+                <div class="form-check mb-3">
+                    {{ form.is_live(class="form-check-input") }}
+                    <label class="form-check-label ms-2">Is Live</label>
+                </div>
+
+                <div class="text-end">
+                    {{ form.add(class="btn btn-primary") }}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary ms-2">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
