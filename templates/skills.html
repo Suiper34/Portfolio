@@ -27,11 +27,11 @@
         <div class="row g-5">
             <div class="col-lg-6 wow fadeInUp" data-wow-delay="0.1s">
                 <h1 class="display-5 mb-5">Skills & Experience</h1>
-                <p class="mb-4">Suip</p>
+                <p class="mb-4"> </p>
                 <h3 class="mb-4">My Skills</h3>
                 <div class="row align-items-center">
                     <div class="col-md-6">
-                        {% if not skills or skills is None %}
+                        {% if not skills %}
                         <div class="skill mb-4">
                             <div class="d-flex justify-content-between">
                                 <h6 class="font-weight-bold">No skills added yet!</h6>
@@ -66,7 +66,7 @@
                 </ul>
                 <div class="tab-content">
                     <!-- industrial experience -->
-                    {% if not experience or experience is None %}
+                    {% if not experience %}
                     <div class="skill mb-4">
                         <div class="d-flex justify-content-between">
                             <h6 class="font-weight-bold">No Experience Uploaded Yet!</h6>
@@ -79,9 +79,9 @@
                         <div class="row gy-5 gx-4">
                             <div class="col-sm-6">
                                 <h5>{{ exp.role }}</h5>
-                                <hr class="text-primary my-2">
                                 <p class="text-primary mb-1">{{ exp.start_year }} - {{ exp.end_year }}</p>
                                 <h6 class="mb-0">{{ exp.experience_field }}</h6>
+                                <hr class="text-primary my-2">
                             </div>
                         </div>
                     </div>
@@ -91,9 +91,9 @@
                         <div class="row gy-5 gx-4">
                             <div class="col-sm-6">
                                 <h5>{{ exp.role }}</h5>
-                                <hr class="text-primary my-2">
                                 <p class="text-primary mb-1">{{ exp.start_year }} - {{ exp.end_year }}</p>
                                 <h6 class="mb-0">{{ exp.experience_field }}</h6>
+                                <hr class="text-primary my-2">
                             </div>
                         </div>
                     </div>

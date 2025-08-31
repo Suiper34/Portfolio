@@ -2,26 +2,6 @@
 
 {% block title %} Sign Up {% endblock %}
 
-{% block header %}
-<!-- Header -->
-<div class="container-fluid bg-light my-6 mt-0" id="home">
-  <div class="container">
-    <div class="row g-5 align-items-center">
-      <div class="col-lg-6 py-6 pb-0 pt-lg-0">
-        <h3 class="text-primary mb-3">I'm</h3>
-        <h1 class="display-3 mb-3">Theophilus Asamoah Gyapong</h1>
-        <h2 class="typed-text-output d-inline"></h2>
-        <div class="typed-text d-none">A Data Scientist, A Web Application Developer, A Backend Engineer, A Mobile
-          Application
-          Developer, UI/UX
-          Designer, An AI Engineer
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-{% endblock %}
-
 {% block content %}
 <div class="page-header min-vh-100">
   <div class="container">
@@ -33,25 +13,14 @@
           style="background-image: url('{{ url_for('static', filename='img/signup.jpg') }}'); background-size: cover;">
         </div>
       </div>
+      {% include 'flash_msg.html' %}
       <div class="col-xl-4 col-lg-5 col-md-7 d-flex flex-column ms-auto me-auto ms-lg-auto me-lg-5">
         <div class="card card-plain">
           <div class="card-header">
             <h4 class="font-weight-bolder">
               Sign Up
             </h4>
-            <p class="mb-0">
-              {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-            <ul class=flashes>
-              {% for category, message in messages %}
-              <li class="{{ category }}">{{ message }}</li>
-              {% endfor %}
-            </ul>
-            {% endif %}
-            {% endwith %}
-            </p>
           </div>
-
           <div class="card-body">
             <form role="form" method="post" action="">
 

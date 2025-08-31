@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block content %}
+{% include 'flash_msg.html' %}
 <!-- Contact -->
 <div class="container-xxl pb-5" id="contact">
     <div class="container py-5">
@@ -18,7 +19,7 @@
         </div>
         <div class="row g-5">
             <div class="col-lg-5 col-md-6 wow fadeInUp" data-wow-delay="0.1s">
-                <p class="mb-2">SuipJhaps</p>
+                <p class="mb-2">SuipJhaps Location</p>
                 <h3 class="fw-bold">Tafo Nhyiaeso, Ashanti</h3>
                 <hr class="w-100">
                 <p class="mb-2">Call me:</p>
@@ -30,7 +31,7 @@
                 <p class="mb-2">Follow me:</p>
                 <div class="d-flex pt-2">
                     <a class="btn btn-square btn-primary me-2" href="{{ github }}"><i class="fab fa-github"></i></a>
-                    <a class="btn btn-square btn-primary me-2" href="{{ tiktok }}"><i class="fab fa-tiktok-t"></i></a>
+                    <a class="btn btn-square btn-primary me-2" href="{{ tiktok }}"><i class="fab fa-tiktok"></i></a>
                     <a class="btn btn-square btn-primary me-2" href="{{ youtube }}"><i class="fab fa-youtube"></i></a>
                     <a class="btn btn-square btn-primary me-2" href="{{ linked_in }}"><i
                             class="fab fa-linkedin-in"></i></a>
@@ -47,12 +48,14 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <div class="form-floating">
-                                {{ form.name(class="form-control", placeholder="Your Name") }} {{ form.name.label }}
+                                {{ form.name(class="form-control", placeholder="Enter Your Name") }} {{ form.name.label
+                                }}
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-floating">
-                                {{ form.email(class="form-control", placeholder="Your Email") }} {{ form.email.label }}
+                                {{ form.email(class="form-control", placeholder=" Enter Your Email") }} {{
+                                form.email.label }}
                             </div>
                         </div>
                         <div class="col-12">
@@ -80,3 +83,5 @@
 {% include 'map.html' %}
 
 {% endblock %}
+
+{% block design %}{% include 'codex.html' %}{% endblock %}

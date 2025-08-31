@@ -30,7 +30,7 @@
 <div class="container-xxl py-6 pb-5" id="team">
     <div class="container">
         <div class="row g-4"></div>
-        {% if not team_members or team_members is None %}
+        {% if not team_members %}
         <div class="col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="0.1s">
             <div class="team-item position-relative">
                 <div class="team-text bg-white rounded-end p-4">
@@ -85,7 +85,7 @@
     <div class="container-fluid py-5">
         <h1 class="display-5 text-center mb-5 wow fadeInUp" data-wow-delay="0.1s">Testimonial</h1>
         <div class="row justify-content-center">
-            {% if not clients or clients is None %}
+            {% if not clients %}
             <div class="col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="0.1s">
                 <div class="team-item position-relative">
                     <div class="team-text bg-white rounded-end p-4">

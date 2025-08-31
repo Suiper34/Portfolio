@@ -1,9 +1,9 @@
 import smtplib
+from datetime import datetime
 from email.message import EmailMessage
 from functools import wraps
 from os import environ, path, urandom
 from typing import Sequence
-from datetime import datetime
 
 from dotenv import load_dotenv
 from flask import (Flask, abort, flash, redirect, render_template, request,
@@ -57,10 +57,6 @@ login_manager.login_view = 'login'
 bootstrap = Bootstrap5(app)
 crsf = CSRFProtect(app)
 
-
-# with app.app_context():
-#     db.drop_all()
-#     db.create_all()
 
 # first admin
 with app.app_context():
@@ -156,12 +152,8 @@ def signup():
             db.session.rollback()
 
         except (OperationalError, DatabaseError) as db_err:
-            # handle missing tables / DB not ready
             print('signup DB error:', str(db_err))
-            flash(
-                'Database not ready.\
-                    Run migrations or create the database tables.',
-                category='error')
+            flash('Database not ready.', category='error')
             db.session.rollback()
             return render_template('signup.html', form=form, admins=admins(),
                                    year=datetime.now().year,)
@@ -207,16 +199,13 @@ def login():
                 )
 
         except (NoSuchTableError, DatabaseError) as db_err:
-            # tables not created or DB problem
             print('DB exception (login):', str(db_err))
-            flash('Database not ready. \
-                Run migrations or create the database tables.',
-                  category='error')
+            flash('Database not ready!', category='error')
             return render_template('login.html', form=form, admins=admins())
 
         except Exception as e:
             print('exception (login):', str(e))
-            flash('An unexpected error occurred. Try again later.',
+            flash('An unexpected error occurred. Try again later!',
                   category='error')
             return render_template('login.html', form=form, admins=admins())
 
@@ -239,7 +228,7 @@ def login():
 
         except Exception as e:
             print('exception (login/affirm):', str(e))
-            flash('Login failed. Try again.', category='error')
+            flash('Login failed. Try again!', category='error')
             return render_template('login.html', form=form, admins=admins(),
                                    year=datetime.now().year,)
 
@@ -277,10 +266,6 @@ def dashboard():
         experiences = db.session.scalars(
             select(Experience).order_by(Experience.category.desc())).all()
 
-        admins = db.session.scalars(
-            select(User).where(User.is_admin is True)
-        ).all()
-
     except NoSuchTableError as nste:
         print('exception:', str(nste))
     except Exception as e:
@@ -295,6 +280,60 @@ def dashboard():
                            experiences=experiences,
                            year=datetime.now().year,
                            )
+
+
+@app.route('/admin-dashboard/users')
+@login_required
+@admins_only
+def manage_users():
+    """List all users for admin management."""
+    try:
+        all_users = db.session.scalars(
+            select(User).order_by(User.username)).all()
+
+    except (NoSuchTableError, DatabaseError) as db_err:
+        print('manage_users DB error:', str(db_err))
+        flash('Database not ready!',
+              category='error')
+        all_users = []
+    except Exception as e:
+        print('manage_users unexpected error:', str(e))
+        all_users = []
+
+    return render_template('admin_users.html',
+                           admins=admins(),
+                           users=all_users,
+                           year=datetime.now().year)
+
+
+@app.route('/admin-dashboard/promote-user/<int:user_id>', methods=['POST'])
+@login_required
+@admins_only
+def promote_user(user_id: int):
+    """Promote a user to admin (set is_admin=True)."""
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            flash('User not found!', category='danger')
+            return redirect(request.referrer or url_for('manage_users'))
+        if user.is_admin:
+            flash('User is already an admin', category='info')
+            return redirect(request.referrer or url_for('manage_users'))
+
+        user.is_admin = True
+        db.session.commit()
+        flash(f'User {user.username} promoted to admin', category='success')
+
+    except (OperationalError, DatabaseError) as db_err:
+        print('promote_user DB error:', str(db_err))
+        flash('Database error while promoting user', category='error')
+        db.session.rollback()
+    except Exception as e:
+        print('promote_user unexpected error:', str(e))
+        flash('Failed to promote user', category='error')
+        db.session.rollback()
+
+    return redirect(request.referrer or url_for('manage_users'))
 
 
 @app.route('/')
@@ -371,7 +410,7 @@ def update_member_profile(member_id: int):
     if not member_to_update_profile:
         flash('member does not exist', category='danger')
         next_url = request.args.get('next')
-        return redirect(next_url or request.url or url_for('dashboard'))
+        return redirect(next_url or url_for('dashboard'))
 
     # populate fields correctly
     form.member_name.data = member_to_update_profile.member_name
@@ -503,7 +542,7 @@ def update_client_profile(client_id: int):
     if not client_to_update_profile:
         flash('Project does not exist', category='danger')
         next_url = request.args.get('next')
-        return redirect(next_url or request.url or url_for('dashboard'))
+        return redirect(next_url or url_for('dashboard'))
 
     form.client_name.data = client_to_update_profile.client_name
     form.testimonial.data = client_to_update_profile.testimonial
@@ -620,7 +659,7 @@ def update_skill(skill_id: int):
     if not skill_to_update:
         flash('Skill does not exist', category='danger')
         next_url = request.args.get('next')
-        return redirect(next_url or request.url or url_for('dashboard'))
+        return redirect(next_url or url_for('dashboard'))
 
     form.skill_name.data = skill_to_update.name
 
@@ -719,9 +758,10 @@ def projects():
         all_projects = db.session.scalars(
             select(Projects).order_by(Projects.created_at)
         ).all()
-    except NoSuchTableError as nste:
-        print('exception:', str(nste))
-    except (DatabaseError, Exception) as e:
+
+    except (NoSuchTableError, DatabaseError) as db_err:
+        print('DB exception (all_projects):', str(db_err))
+    except Exception as e:
         print('exception:', str(e))
 
     return render_template('projects.html',
@@ -929,9 +969,35 @@ def services():
 
 @app.route('/about')
 def about():
+    number_of_projects: int = 0
+    number_of_clients: int = 0
+
+    try:
+        all_projects: Sequence[Projects] = db.session.scalars(
+            select(Projects)).all()
+
+        clients: Sequence[Clients] = db.session.scalars(
+            select(Clients)).all()
+
+    except (NoSuchTableError, DatabaseError) as db_err:
+        print('DB exception (no_of_projects):', str(db_err))
+    except Exception as e:
+        print('exception (no_of_projects):', str(e))
+
+    else:
+        if all_projects:
+            for project in all_projects:
+                number_of_projects += 1
+
+        if clients:
+            for client in clients:
+                number_of_clients += 1
+
     return render_template('about.html',
                            admins=admins(),
-                           year=datetime.now().year,)
+                           year=datetime.now().year,
+                           projects_num=number_of_projects,
+                           clients_num=number_of_clients,)
 
 
 @app.route('/contact-form', methods=['POST', 'GET'])
@@ -984,7 +1050,7 @@ def contact_form():
                            linked_in=environ.get('LINKED_IN'),)
 
 
-@app.route('/contact-form/read-more')
+@app.route('/about/read-more')
 def read_more():
 
     return render_template('read-more.html',
