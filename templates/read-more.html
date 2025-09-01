@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block title %}About Theophilus — Read More{% endblock %}
+
+{% block header %}
+<div class="container-fluid bg-primary text-white py-5 mb-4">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="display-5 fw-bold">Theophilus Asamoah Gyapong</h1>
+                <p class="lead mb-0">Backend Engineer • Mobile & Web App Developer • Data Scientist</p>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <a class="btn btn-outline-light me-2" href="{{ url_for('contact_form') }}">Hire Me</a>
+                <a class="btn btn-light" href="{{ url_for('projects') }}">View Work</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="card shadow-sm">
+            <img src="{{ url_for('static', filename='img/profile.jpg') }}" class="card-img-top" alt="Profile">
+            <div class="card-body">
+                <h5 class="card-title">Theophilus</h5>
+                <p class="card-text text-muted mb-1">Full-stack back-end focused developer</p>
+                <p class="small text-muted mb-2"><strong>Location:</strong> Ghana</p>
+                <div class="mb-3">
+                    <a class="btn btn-sm btn-outline-primary me-1" href="{{ github or '#' }}"><i
+                            class="fab fa-github"></i></a>
+                    <a class="btn btn-sm btn-outline-primary me-1" href="{{ linked_in or '#' }}"><i
+                            class="fab fa-linkedin"></i></a>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ youtube or '#' }}"><i
+                            class="fab fa-youtube"></i></a>
+                </div>
+
+                <div>
+                    <h6 class="mb-2">Quick Facts</h6>
+                    <ul class="list-unstyled small text-muted mb-0">
+                        <li><strong>Years of experience:</strong> {{ year - 2022 }}</li>
+                        <li><strong>Projects:</strong> {{ projects_num or '—' }}</li>
+                        <li><strong>Clients:</strong> {{ clients_num or '—' }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <h4>About me</h4>
+                <p>I am a passionate backend engineer, cross platform mobile application developer, GUI developer and
+                    data analyst with expertise in building robust backend systems, responsive and beautiful
+                    user-friendly interfaces and visualizing meaningful data insights. My goal is to deliver high
+                    quality solutions which solve real-world challenges and provide exceptional user experiences.
+                    I am consistently learning and exploring new technologies to stay to keep up with modern methods,
+                    development and
+                    solution style and also relevant as modern problem solver.
+                </p>
+
+                <h5 class="mt-4">Specialties</h5>
+                <div class="mb-3">
+                    <span class="badge bg-primary me-1 mb-1">Python</span>
+                    <span class="badge bg-primary me-1 mb-1">Data Analytics</span>
+                    <span class="badge bg-primary me-1 mb-1">Backend (FastApi, Django, Flask, Firebase, Docker, SQL)</span>
+                    <span class="badge bg-primary me-1 mb-1">Mobile (Flutter)</span>
+                    <span class="badge bg-primary me-1 mb-1">Web Scraping (Beautiful Soup)</span>
+                    <span class="badge bg-primary me-1 mb-1">Web and GUI automation (Selenium)</span>
+                    <span class="badge bg-primary me-1 mb-1">Graphic Design (Photoshop, Canva)</span>
+                    <span class="badge bg-primary me-1 mb-1">HTML/CSS</span>
+                    <span class="badge bg-primary me-1 mb-1">UI/UX Design (Figma, Canva)</span>
+
+                </div>
+
+                <h5 class="mt-4">Interests & Hobbies</h5>
+                <ul>
+                    <li>Artificial intelligence</li>
+                    <li>Data science</li>
+                    <li>Cross platform app development</li>
+                    <li>Cybersecurity</li>
+                    <li>Web app development</li>
+                    <li>Exploring new technologies</li>
+                    <li>Building side projects</li>
+                    <li>Mentoring</li>
+                    <li>Playing piano & choral music</li>
+                    <li>Animation / Animes</li>
+                </ul>
+
+                <div class="mt-4">
+                    <a class="btn btn-primary" href="{{ url_for('contact_form') }}">Contact</a>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('projects') }}">View Projects</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- download-cv -->
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5>Download CV</h5>
+                <a class="btn btn-outline-primary" href="{{ url_for('download_cv', cv='Theophilus_Asamoah_CV.pdf') }}">Download
+                    PDF</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block design %}
+    <div class="col-md-6 text-center text-md-end">
+        <a class="text-muted me-3" href="{{ github }}"><i class="fab fa-github"></i></a>
+        <a class="text-muted me-3" href="{{ linked_in }}"><i class="fab fa-linkedin"></i></a>
+        <a class="text-muted me-3" href="{{ youtube }}"><i class="fab fa-youtube"></i></a>
+    </div>
+{% endblock %}
