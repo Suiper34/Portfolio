@@ -31,7 +31,7 @@ from forms.team_form import TeamForm
 from models import db
 from models.admin import User
 from models.clients import Clients
-from models.experience import Experience  # SchoolExperience
+from models.experience import Experience
 from models.projects import Projects
 from models.skills import Skills
 from models.team import Team
@@ -427,6 +427,7 @@ def update_member_profile(member_id: int):
                     github_link=form.github_link.data)
             )
             db.session.commit()
+            return redirect(request.args.get('next') or url_for('dashboard'))
 
         except IntegrityError as ie:
             print('exception:', str(ie))
@@ -670,6 +671,7 @@ def update_skill(skill_id: int):
                     proficiency=form.proficiency.data)
             )
             db.session.commit()
+            return redirect(request.args.get('next') or url_for('dashboard'))
 
         except Exception as e:
             print('exception:', str(e))
@@ -1055,7 +1057,10 @@ def read_more():
 
     return render_template('read-more.html',
                            admins=admins(),
-                           year=datetime.now().year,)
+                           year=datetime.now().year,
+                           github=environ.get('GITHUB'),
+                           youtube=environ.get('YOUTUBE'),
+                           linked_in=environ.get('LINKED_IN'),)
 
 
 @app.route('/download-file/<path:cv>')

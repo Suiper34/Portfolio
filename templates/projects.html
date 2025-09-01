@@ -70,9 +70,9 @@
                         {% endif %}
 
                         <ul class="list-unstyled small text-muted mb-3">
-                            {% if project.tech_stack %}<li><strong>Tech:</strong> {{ project.tech_stack }}</li>{% endif
+                            {% if project.tech_stack %}<li><strong>Tech:</strong>{{ project.tech_stack }}</li>{% endif
                             %}
-                            {% if project.platform %}<li><strong>Platform:</strong> {{ project.platform }}</li>{% endif
+                            {% if project.platform %}<li><strong>Platform:</strong>{{ project.platform }}</li>{% endif
                             %}
                             {% if project.apk_size %}<li><strong>Size:</strong> {{ project.apk_size }}</li>{% endif %}
                             <li><strong>Stars:</strong> {{ project.github_stars or 0 }}</li>
@@ -89,7 +89,7 @@
                             <a href="{{ project.github_url }}" target="_blank" rel="noopener"
                                 class="btn btn-sm btn-outline-dark">GitHub</a>
                             {% endif %}
-                            {% if project.file_name %}
+                            {% if current_user.is_authenticated and project.file_name %}
                             <a href="{{ url_for('download_cv', cv=project.file_name) }}"
                                 class="btn btn-sm btn-outline-secondary">Download</a>
                             {% endif %}
