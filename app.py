@@ -45,7 +45,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
 app.config['FLASK_ADMIN_SWATCH'] = 'cyborg'
 app.config['SQLALCHEMY_DATABASE_URI'] = environ.get(
-    'DATABASE_URI', 'sqlite:///jhaps_db.db')
+    'DATABASE_URI', 'DB_URI_DOCKER', 'sqlite:///jhaps_db.db')
 app.config['UPLOAD_FOLDER'] = 'static/files'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # (100 mb)
 # admin = Admin(app, name='portfolio')
