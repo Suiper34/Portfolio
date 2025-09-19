@@ -71,9 +71,13 @@ with app.app_context():
 
 
 def admins_only(func):
-    """Decorator to restrict access to admin users only.
+    """
+    Decorator: allow only admin users.
 
-    If the user is not an admin, aborts with 403 Forbidden.
+    Checks the database for users with `is_admin==True`. If no admins exist
+    or current_user is not among them, flashes and aborts(403).
+
+    Side effects: reads the User table. Returns decorated view or aborts.
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -101,6 +105,12 @@ def admins_only(func):
 
 
 def admins() -> Sequence[User]:
+    """
+    Return a list of admin users.
+
+    Safe: on DB/table errors returns an empty list. Use this to pass admin
+    context into templates.
+    """
     try:
         return db.session.scalars(
             select(User).where(User.is_admin == True)
@@ -114,19 +124,33 @@ def admins() -> Sequence[User]:
 
 @login_manager.user_loader
 def load_user(user_id):
-    """Load user from database for Flask-Login session management.
+    """
+    Flask-Login user loader.
 
     Args:
-        user_id (str): The ID of the user to load
+        user_id (str|int): user id stored in session.
 
     Returns:
-        User: The User object if found, None otherwise
+        User | None: the loaded User model instance or None.
     """
     return db.session.get(User, int(user_id))
 
 
 @app.route('/sign-up', methods=['POST', 'GET'])
 def signup():
+    """
+    Create a new user account and log them in.
+
+    Methods:
+      - GET: Render signup form.
+      - POST: Validate form, create User, hash password, commit to DB
+              and log user in.
+
+    Returns:
+      - On GET or validation failure: render signup template
+      - On success: redirect to next_url (string)
+      - On DB errors: renders signup with appropriate flash messages
+    """
     next_url: str = request.args.get('next') or url_for('home')
     if current_user.is_authenticated:
         return redirect(next_url)
@@ -181,6 +205,19 @@ def signup():
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
+    """
+    Authenticate user by username or email and password.
+
+    Methods:
+      - GET: Render login form.
+      - POST: Validate form, lookup user (username then email),
+              verify password and log in.
+
+    Returns:
+      - On GET or failed auth: render_template('login.html', form=form, ...)
+      - On success: redirect to next_url (string)
+      - On DB errors: render_template with error flash
+    """
     next_url = request.args.get('next') or url_for('home')
     if current_user.is_authenticated:
         return redirect(next_url)
@@ -242,6 +279,17 @@ def login():
 @login_required
 @admins_only
 def dashboard():
+    """
+    Render admin dashboard with aggregated resources.
+
+    Methods:
+      - GET: Query Projects, Clients, Team, Skills, Experience and render
+             dashboard.
+
+    Returns:
+      - render_template('admin_dashboard.html', projects=..., clients=..., ...)
+      - If not authenticated: redirect to login with next parameter
+    """
     if not current_user.is_authenticated:
         return redirect(login_url(
             login_view=login_manager.login_view,
@@ -286,7 +334,15 @@ def dashboard():
 @login_required
 @admins_only
 def manage_users():
-    """List all users for admin management."""
+    """
+    List all users for admin management.
+
+    Methods:
+      - GET: Query User table and render admin users page.
+
+    Returns:
+      - render_template('admin_users.html', users=all_users, ...)
+    """
     try:
         all_users = db.session.scalars(
             select(User).order_by(User.username)).all()
@@ -310,7 +366,16 @@ def manage_users():
 @login_required
 @admins_only
 def promote_user(user_id: int):
-    """Promote a user to admin (set is_admin=True)."""
+    """
+    Promote a user to admin (set is_admin=True).
+
+    Methods:
+      - POST: Update user.is_admin and commit.
+
+    Returns:
+      - Redirect back to referring page or manage_users.
+      - Flashes success or error messages on DB failure.
+    """
     try:
         user = db.session.get(User, user_id)
         if not user:
@@ -338,6 +403,15 @@ def promote_user(user_id: int):
 
 @app.route('/')
 def home():
+    """
+    Home page: load team members and clients.
+
+    Methods:
+      - GET: Query Team and Clients and render public index.
+
+    Returns:
+      - render_template('index.html', team_members=..., clients=..., ...)
+    """
     team_members = []
     clients = []
     try:
@@ -365,6 +439,16 @@ def home():
 @login_required
 @admins_only
 def add_member():
+    """
+    Add a team member (admin only).
+
+    Methods:
+      - GET: Render add-member form.
+      - POST: Validate form and create Team entry.
+
+    Returns:
+      - On GET or validation failure: render add-member template.
+    """
     form = TeamForm()
 
     if form.validate_on_submit():
@@ -403,6 +487,17 @@ def add_member():
 @login_required
 @admins_only
 def update_member_profile(member_id: int):
+    """
+    Update an existing team member (admin only).
+
+    Methods:
+      - GET: Populate form with current member data and render form.
+      - POST: Validate and update member via update() call.
+
+    Returns:
+      - On success: redirect to dashboard (or next param)
+      - On failure: render add-member.html with form and flash messages
+    """
     form = TeamForm()
 
     member_to_update_profile = db.session.get(Team, member_id)
@@ -450,6 +545,15 @@ def update_member_profile(member_id: int):
 @login_required
 @admins_only
 def delete_member(member_id: int):
+    """
+    Delete a team member by id (admin only).
+
+    Methods:
+      - GET: Delete the member and redirect.
+
+    Returns:
+      - Redirect to dashboard (or next param) with flash indicating result.
+    """
     member_to_delete = db.session.get(Team, member_id)
 
     if not member_to_delete:
@@ -468,6 +572,19 @@ def delete_member(member_id: int):
 @login_required
 @admins_only
 def add_client():
+    """
+    Add a client with optional image upload (admin only).
+
+    Methods:
+      - GET: Render add-client form.
+      - POST: Validate ClientForm; save uploaded image to UPLOAD_FOLDER using
+              secure_filename; set client.client_img and commit.
+
+    Returns:
+      - On GET/validation failure: render add-client template.
+      - On success: redirect to dashboard (or next param)
+      - On error: redirect back with flash
+    """
     form = ClientForm()
 
     if form.validate_on_submit():
@@ -517,6 +634,16 @@ def add_client():
 @login_required
 @admins_only
 def delete_client(client_id: int):
+    """
+    Delete a client by id (admin only).
+
+    Methods:
+      - GET: Delete client and commit.
+
+    Returns:
+      - Redirect to dashboard (or next param) with flash indicating
+        success/error.
+    """
     client_to_delete = db.session.get(Clients, client_id)
 
     if not client_to_delete:
@@ -536,6 +663,19 @@ def delete_client(client_id: int):
 @login_required
 @admins_only
 def update_client_profile(client_id: int):
+    """
+    Update a client's profile and image (admin only).
+
+    Methods:
+      - GET: Populate form with client's current data and render form.
+      - POST: Accept optional image replacement, validate inputs, and update
+            DB.
+
+    Returns:
+      - On success: redirect to dashboard (or next param)
+      - On validation or DB error: render add-client.html or redirect with
+        flash
+    """
     form = ClientForm()
 
     client_to_update_profile = db.session.get(Clients, client_id)
@@ -593,6 +733,15 @@ def update_client_profile(client_id: int):
 
 @app.route('/skills')
 def skills():
+    """
+    Skills page: returns skills and experience ordered for display.
+
+    Methods:
+      - GET: Query Skills and Experience and render skills page.
+
+    Returns:
+      - render_template('skills.html', skills=..., experience=..., ...)
+    """
     try:
         skills = db.session.scalars(
             select(Skills).order_by(Skills.proficiency.desc())).all()
@@ -617,6 +766,17 @@ def skills():
 @login_required
 @admins_only
 def add_skill():
+    """
+    Add a skill (admin only).
+
+    Methods:
+      - GET: Render add-skill form.
+      - POST: Validate form and add Skills record.
+
+    Returns:
+      - On success: redirect to dashboard (or next param)
+      - On failure: render add-skill.html with flash
+    """
     form = SkillsForm()
 
     if form.validate_on_submit():
@@ -653,6 +813,17 @@ def add_skill():
 @login_required
 @admins_only
 def update_skill(skill_id: int):
+    """
+    Update a skill's proficiency (admin only).
+
+    Methods:
+      - GET: Populate form with current skill data.
+      - POST: Validate and update proficiency.
+
+    Returns:
+      - On success: redirect to dashboard (or next param)
+      - On error: redirect back with flash
+    """
     form = SkillsForm()
 
     skill_to_update = db.session.get(Skills, skill_id)
@@ -688,6 +859,15 @@ def update_skill(skill_id: int):
 @login_required
 @admins_only
 def delete_skill(skill_id: int):
+    """
+    Delete a skill by id (admin only).
+
+    Methods:
+      - GET: Delete and commit.
+
+    Returns:
+      - Redirect to dashboard with flash indicating result.
+    """
     skill_to_delete = db.session.get(Skills, skill_id)
 
     if not skill_to_delete:
@@ -706,6 +886,17 @@ def delete_skill(skill_id: int):
 @login_required
 @admins_only
 def add_experience():
+    """
+    Add an experience record (admin only).
+
+    Methods:
+      - GET: Render experience form.
+      - POST: Validate and create Experience entry.
+
+    Returns:
+      - On success: redirect to dashboard (or next param)
+      - On failure: redirect back with flash
+    """
     form = ExperienceForm()
 
     if form.validate_on_submit():
@@ -740,6 +931,15 @@ def add_experience():
 @login_required
 @admins_only
 def delete_experience(experience_id: int):
+    """
+    Delete an experience record (admin only).
+
+    Methods:
+      - GET: Delete and commit.
+
+    Returns:
+      - Redirect to dashboard with flash indicating result.
+    """
     experience_to_delete = db.session.get(Experience, experience_id)
 
     if not experience_to_delete:
@@ -756,6 +956,15 @@ def delete_experience(experience_id: int):
 
 @app.route('/my-projects')
 def projects():
+    """
+    Render read-only projects listing for public visitors.
+
+    Methods:
+      - GET: Query Projects and render projects.html.
+
+    Returns:
+      - render_template('projects.html', all_projects=all_projects, ...)
+    """
     try:
         all_projects = db.session.scalars(
             select(Projects).order_by(Projects.created_at)
@@ -776,6 +985,18 @@ def projects():
 @login_required
 @admins_only
 def add_project():
+    """
+    Create a new project (admin only).
+
+    Methods:
+      - GET: Render add-project form.
+      - POST: Validate form; save image and file uploads to UPLOAD_FOLDER and
+              create Projects record with filenames stored in DB.
+
+    Returns:
+      - On success: redirect to dashboard (or next param)
+      - On failure: render add-project.html or redirect with flash
+    """
     form = Project()
 
     if form.validate_on_submit():
@@ -852,6 +1073,15 @@ def add_project():
 @login_required
 @admins_only
 def delete_project(project_id: int):
+    """
+    Delete a project by id (admin only).
+
+    Methods:
+      - GET: Delete project and commit.
+
+    Returns:
+      - Redirect to dashboard with flash indicating result.
+    """
     project_to_delete = db.session.get(Projects, project_id)
 
     if not project_to_delete:
@@ -871,6 +1101,17 @@ def delete_project(project_id: int):
 @login_required
 @admins_only
 def update_project(project_id: int):
+    """
+    Update an existing project and optionally replace files (admin only).
+
+    Methods:
+      - GET: Populate form with existing project data.
+      - POST: Save optional new image/file and update DB fields.
+
+    Returns:
+      - On success: redirect to dashboard (or next param)
+      - On error: render add-project.html or redirect with flash
+    """
     form = Project()
 
     project_to_update = db.session.get(Projects, project_id)
@@ -963,6 +1204,15 @@ def update_project(project_id: int):
 
 @app.route('/services')
 def services():
+    """
+    Render services page (public).
+
+    Methods:
+      - GET: Render services.html.
+
+    Returns:
+      - render_template('services.html', ...)
+    """
     return render_template('services.html',
                            whatsapp=environ.get('WHATSAPP'),
                            admins=admins(),
@@ -971,6 +1221,15 @@ def services():
 
 @app.route('/about')
 def about():
+    """
+    About page: compute project & client counts and render about.html.
+
+    Methods:
+      - GET: Query Projects and Clients, compute counts and render page.
+
+    Returns:
+      - render_template('about.html', projects_num=int, clients_num=int, ...)
+    """
     number_of_projects: int = 0
     number_of_clients: int = 0
 
@@ -1004,6 +1263,18 @@ def about():
 
 @app.route('/contact-form', methods=['POST', 'GET'])
 def contact_form():
+    """
+    Contact form: send email using SMTP_SSL (Gmail).
+
+    Methods:
+      - GET: Render contact form.
+      - POST: Validate ContactForm and send email using MAIL & PASSWORD env
+      vars.
+
+    Returns:
+      - On GET or failure: render_template('contact.html', form=form, ...)
+      - On success: render_template('contact.html', is_sent=True, ...)
+    """
     form = ContactForm()
 
     if form.validate_on_submit():
@@ -1054,7 +1325,15 @@ def contact_form():
 
 @app.route('/about/read-more')
 def read_more():
+    """
+    Render a detailed 'read more about me' page.
 
+    Methods:
+      - GET: Render read-more.html. (No POST)
+
+    Returns:
+      - render_template('read-more.html', ...)
+    """
     return render_template('read-more.html',
                            admins=admins(),
                            year=datetime.now().year,
@@ -1065,6 +1344,19 @@ def read_more():
 
 @app.route('/download-file/<path:cv>')
 def download_cv(cv):
+    """
+    Serve a file from UPLOAD_FOLDER as attachment.
+
+    Methods:
+      - GET: Serve file at given relative path (cv) from UPLOAD_FOLDER.
+
+    Args:
+      - cv (str): file name relative to UPLOAD_FOLDER.
+
+    Returns:
+      - send_from_directory(..., as_attachment=True) on success.
+      - abort(404) if file not found.
+    """
     try:
         return send_from_directory(
             app.config['UPLOAD_FOLDER'], cv, as_attachment=True
@@ -1075,6 +1367,15 @@ def download_cv(cv):
 
 @app.route('/logging-out')
 def logout():
+    """
+    Log out the current user and redirect to home (or next).
+
+    Methods:
+      - GET: Log out authenticated user.
+
+    Returns:
+      - Redirect to home or next parameter.
+    """
     if current_user.is_authenticated:
         logout_user()
         return redirect(request.args.get('next') or url_for('home'))
