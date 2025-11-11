@@ -4,7 +4,14 @@ A personal portfolio / admin CMS built with Flask, SQLAlchemy and Bootstrap.
 
 ---
 
-**Features🚀**: user auth, admin dashboard, projects, clients, team, skills, experience, file uploads, migrations and Docker support.
+**Features🚀**:
+
+- User authentication (signup/login)
+- Admin dashboard (projects, clients, team, skills, experience)
+- File uploads (project images, client images, downloadable files)
+- Flask-Migrate powered DB migrations
+- Docker + docker-compose support
+- Tests with pytest
 
 ---
 
@@ -64,7 +71,7 @@ A personal portfolio / admin CMS built with Flask, SQLAlchemy and Bootstrap.
     ├── models/
     | ├── admin.py
     | ├── clients.py
-    | ├── exoerience.py
+    | ├── experience.py
     | ├── projects.py
     | ├── skills.py
     | ├── team.py
@@ -126,6 +133,11 @@ A personal portfolio / admin CMS built with Flask, SQLAlchemy and Bootstrap.
     │ ├── services.html
     │ ├── signup.html
     │ ├── skills.html
+    ├── tests/
+    | ├── config_test.py
+    | ├── test_forms.py
+    | ├── test_models.py
+    | ├── test_routes.py
     ├── .env
     ├── CI_Build
     ├── deploy.sh
@@ -261,3 +273,28 @@ See `.env.sample` for the full list.
 ## 🛠️ Maintainer
 
 - JhapTech / Theophilus Asamoah Gyapong — [`email`]('jhapson34@gmail.com') or [`whatsapp`](wa.me/+233201166556)
+
+---
+
+## 🧾 Logging
+
+This application uses a simple, robust logging configuration:
+
+- Logs are written to console and to a rotating file at `logs/app.log`.
+- Default log level is INFO. You can change it with the environment variable:
+
+  ```python
+  LOG_LEVEL=DEBUG
+  ```
+
+- The `logs/` directory is created automatically (if writable). Ensure the running user has write permissions when deploying.
+
+### How to read logs:
+
+- Local: open `logs/app.log`
+- Docker: `docker compose logs web` (shows console logs)
+- In production ensure logs are captured by your hosting provider (Railway, Fly, Render, etc.)
+
+### Troubleshooting tip:
+
+- If you see `'Skipping first-admin setup'` in logs, it's normal during first migrations when tables don't yet exist.
