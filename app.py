@@ -1,15 +1,16 @@
-from logging.handlers import RotatingFileHandler
 import logging
 import smtplib
-from datetime import datetime
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from functools import wraps
+from logging.handlers import RotatingFileHandler
 from os import environ, makedirs, path, urandom
+from pathlib import Path
 from typing import Optional, Sequence
 
 from dotenv import load_dotenv
-from flask import (Flask, abort, flash, redirect, render_template, request,
-                   send_from_directory, url_for)
+from flask import (Flask, abort, flash, jsonify, redirect, render_template,
+                   request, send_from_directory, url_for)
 # from flask_admin import Admin
 from flask_bootstrap import Bootstrap5
 from flask_login import (LoginManager, current_user, login_required, login_url,
@@ -38,17 +39,38 @@ from models.projects import Projects
 from models.skills import Skills
 from models.team import Team
 
-load_dotenv('.env')
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY: bytes = urandom(32)
+upload_dir = BASE_DIR / 'static' / 'files'
+upload_dir.mkdir(parents=True, exist_ok=True)
+
+
+def resolve_secret_key() -> str:
+    for candidate in (
+        environ.get('SECRET_KEY'),
+        environ.get('FLASK_SECRET_KEY'),
+        environ.get('APP_SECRET_KEY'),
+    ):
+        if candidate:
+            return candidate
+
+    return urandom(32).hex()
+
+
+def resolve_database_uri() -> str:
+    return (
+        environ.get('DATABASE_URI')
+        or environ.get('DB_URI_DOCKER')
+        or 'sqlite:///jhaps_db.db'
+    )
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = SECRET_KEY
+app.config['SECRET_KEY'] = resolve_secret_key()
 app.config['FLASK_ADMIN_SWATCH'] = 'cyborg'
-app.config['SQLALCHEMY_DATABASE_URI'] = environ.get(
-    'DATABASE_URI', 'DB_URI_DOCKER', 'sqlite:///jhaps_db.db')
-app.config['UPLOAD_FOLDER'] = 'static/files'
+app.config['SQLALCHEMY_DATABASE_URI'] = resolve_database_uri()
+app.config['UPLOAD_FOLDER'] = str(upload_dir)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # (100 mb)
 # admin = Admin(app, name='portfolio')
 db.init_app(app)
@@ -57,8 +79,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 bootstrap = Bootstrap5(app)
-crsf = CSRFProtect(app)
-
+csrf = CSRFProtect(app)
 
 LOG_LEVEL = environ.get('LOG_LEVEL', 'INFO').upper()
 
@@ -99,6 +120,7 @@ except Exception:
 # integrate Flask's app.logger with the logger handlers/level
 app.logger.handlers = logger.handlers[:]
 app.logger.setLevel(logger.level)
+app.logger.propagate = False
 
 # first admin
 with app.app_context():
@@ -106,6 +128,7 @@ with app.app_context():
         if first_admin := db.session.get(User, 1):
             first_admin.is_admin = True
             db.session.commit()
+
     except Exception:
         # skip when tables does not exist yet (running migrations)
         logger.debug(
@@ -127,7 +150,7 @@ def admins_only(func):
 
         try:
             admins_list: Sequence[User] = db.session.scalars(
-                select(User).where(User.is_admin == True)
+                select(User).where(User.is_admin.is_(True))
             ).all()
 
         except (NoSuchTableError, DatabaseError) as db_err:
@@ -160,7 +183,7 @@ def admins() -> Sequence[User]:
 
     try:
         return db.session.scalars(
-            select(User).where(User.is_admin == True)
+            select(User).where(User.is_admin.is_(True))
         ).all()
 
     except (NoSuchTableError, DatabaseError) as db_err:
@@ -183,7 +206,25 @@ def load_user(user_id):
     Returns:
         User | None: the loaded User model instance or None.
     """
-    return db.session.get(User, int(user_id))
+
+    try:
+        return db.session.get(User, int(user_id))
+
+    except (TypeError, ValueError):
+        logger.warning('Invalid user_id supplied to load_user: %s', user_id)
+        return None
+
+
+@app.route('/health', methods=['GET'])
+def health() -> tuple:
+    """
+    Lightweight JSON health check endpoint for container orchestration.
+    """
+
+    return jsonify(
+        status='ok',
+        timestamp=datetime.now(timezone.utc).isoformat() + 'Z'
+    ), 200
 
 
 @app.route('/sign-up', methods=['POST', 'GET'])
