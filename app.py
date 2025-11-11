@@ -1,9 +1,11 @@
+from logging.handlers import RotatingFileHandler
+import logging
 import smtplib
 from datetime import datetime
 from email.message import EmailMessage
 from functools import wraps
-from os import environ, path, urandom
-from typing import Sequence
+from os import environ, makedirs, path, urandom
+from typing import Optional, Sequence
 
 from dotenv import load_dotenv
 from flask import (Flask, abort, flash, redirect, render_template, request,
@@ -58,16 +60,57 @@ bootstrap = Bootstrap5(app)
 crsf = CSRFProtect(app)
 
 
+LOG_LEVEL = environ.get('LOG_LEVEL', 'INFO').upper()
+
+logger = logging.getLogger('jhaptech')
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+
+# formatter
+formatter = logging.Formatter(
+    '%(asctime)s %(levelname)s %(name)s [%(funcName)s:%(lineno)d] - \
+        %(message)s'
+)
+
+# console handler
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+console_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+logger.addHandler(console_handler)
+
+# file handler
+try:
+    logs_dir = path.join(path.dirname(__file__), 'logs')
+
+    if not path.exists(logs_dir):
+        makedirs(logs_dir, exist_ok=True)
+
+    file_handler = RotatingFileHandler(
+        path.join(logs_dir, 'app.log'),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+    )
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+    logger.addHandler(file_handler)
+
+except Exception:
+    logger.exception('Failed to set up file logging handler')
+
+# integrate Flask's app.logger with the logger handlers/level
+app.logger.handlers = logger.handlers[:]
+app.logger.setLevel(logger.level)
+
 # first admin
 with app.app_context():
     try:
-        first_admin: User | None = db.session.get(User, 1)
-        if first_admin:
+        if first_admin := db.session.get(User, 1):
             first_admin.is_admin = True
             db.session.commit()
     except Exception:
         # skip when tables does not exist yet (running migrations)
-        pass
+        logger.debug(
+            'Skipping first-admin setup: database/tables likely not present'
+        )
 
 
 def admins_only(func):
@@ -83,13 +126,16 @@ def admins_only(func):
     def wrapper(*args, **kwargs):
 
         try:
-            admins_list = db.session.scalars(
+            admins_list: Sequence[User] = db.session.scalars(
                 select(User).where(User.is_admin == True)
             ).all()
-        except (NoSuchTableError, DatabaseError):
+
+        except (NoSuchTableError, DatabaseError) as db_err:
+            logger.warning('admins_only: DB table error: %s', db_err)
             admins_list = []
-        except Exception as e:
-            print('exception:', e)
+
+        except Exception:
+            logger.exception('admins_only: unexpected error')
             admins_list = []
 
         if not admins_list:
@@ -111,14 +157,18 @@ def admins() -> Sequence[User]:
     Safe: on DB/table errors returns an empty list. Use this to pass admin
     context into templates.
     """
+
     try:
         return db.session.scalars(
             select(User).where(User.is_admin == True)
         ).all()
-    except (NoSuchTableError, DatabaseError):
+
+    except (NoSuchTableError, DatabaseError) as db_err:
+        logger.warning("admins(): DB error: %s", db_err)
         return []
-    except Exception as e:
-        print('exception:', str(e))
+
+    except Exception:
+        logger.exception('admins(): unexpected error')
         return []
 
 
@@ -151,7 +201,9 @@ def signup():
       - On success: redirect to next_url (string)
       - On DB errors: renders signup with appropriate flash messages
     """
+
     next_url: str = request.args.get('next') or url_for('home')
+
     if current_user.is_authenticated:
         return redirect(next_url)
 
@@ -159,7 +211,7 @@ def signup():
 
     if form.validate_on_submit():
         try:
-            user = User(
+            user: User = User(
                 name=form.name.data,
                 username=form.username.data,
                 email=form.email.data,
@@ -170,31 +222,34 @@ def signup():
             flash('New account registered!', category='success')
 
         except IntegrityError as ie:
-            print('signup IntegrityError:', str(ie))
+            logger.warning('signup IntegrityError: %s', ie)
             flash('Username or Email already used — \
                 choose a different one.', category='warning')
             db.session.rollback()
 
         except (OperationalError, DatabaseError) as db_err:
-            print('signup DB error:', str(db_err))
+            logger.error("signup DB error: %s", db_err)
             flash('Database not ready.', category='error')
             db.session.rollback()
+
             return render_template('signup.html', form=form, admins=admins(),
                                    year=datetime.now().year,)
 
-        except Exception as e:
-            print('signup unexpected exception:', str(e))
+        except Exception:
+            logger.exception('signup unexpected error')
             flash(
                 'Failed to register account! \
                     Try again or check the server logs.',
                 category='danger')
             db.session.rollback()
+
             return render_template('signup.html', form=form, admins=admins(),
                                    year=datetime.now().year,)
 
         else:
             login_user(user, remember=True)
             flash('Account created and logged in!', category='success')
+
             return redirect(next_url)
 
     return render_template('signup.html',
@@ -218,7 +273,9 @@ def login():
       - On success: redirect to next_url (string)
       - On DB errors: render_template with error flash
     """
-    next_url = request.args.get('next') or url_for('home')
+
+    next_url: str = request.args.get('next') or url_for('home')
+
     if current_user.is_authenticated:
         return redirect(next_url)
 
@@ -227,23 +284,25 @@ def login():
     if form.validate_on_submit():
         try:
             # try username first, then email
-            user = db.session.scalar(
+            user: Optional[User] = db.session.scalar(
                 select(User).where(User.username == form.name_or_email.data)
             )
             if not user:
-                user = db.session.scalar(
+                user: Optional[User] = db.session.scalar(
                     select(User).where(User.email == form.name_or_email.data)
                 )
 
         except (NoSuchTableError, DatabaseError) as db_err:
-            print('DB exception (login):', str(db_err))
+            logger.error('DB exception (login): %s', db_err)
             flash('Database not ready!', category='error')
+
             return render_template('login.html', form=form, admins=admins())
 
-        except Exception as e:
-            print('exception (login):', str(e))
+        except Exception:
+            logger.exception('login unexpected error')
             flash('An unexpected error occurred. Try again later!',
                   category='error')
+
             return render_template('login.html', form=form, admins=admins())
 
         if not user:
@@ -263,9 +322,10 @@ def login():
             flash('Logged in successfully!', category='success')
             return redirect(next_url)
 
-        except Exception as e:
-            print('exception (login/affirm):', str(e))
+        except Exception:
+            logger.exception("exception during login/affirm_password")
             flash('Login failed. Try again!', category='error')
+
             return render_template('login.html', form=form, admins=admins(),
                                    year=datetime.now().year,)
 
@@ -290,6 +350,7 @@ def dashboard():
       - render_template('admin_dashboard.html', projects=..., clients=..., ...)
       - If not authenticated: redirect to login with next parameter
     """
+
     if not current_user.is_authenticated:
         return redirect(login_url(
             login_view=login_manager.login_view,
@@ -298,26 +359,27 @@ def dashboard():
         ))
 
     try:
-        projects = db.session.scalars(
+        projects: Sequence[Projects] = db.session.scalars(
             select(Projects).order_by(Projects.created_at.desc())).all()
 
-        clients = db.session.scalars(
+        clients: Sequence[Clients] = db.session.scalars(
             select(Clients).order_by(Clients.client_name.desc())
         ).all()
 
-        team_members = db.session.scalars(
+        team_members: Sequence[Team] = db.session.scalars(
             select(Team).order_by(Team.member_name.desc())).all()
 
-        skills = db.session.scalars(
+        skills: Sequence[Skills] = db.session.scalars(
             select(Skills).order_by(Skills.proficiency.desc())).all()
 
-        experiences = db.session.scalars(
+        experiences: Sequence[Experience] = db.session.scalars(
             select(Experience).order_by(Experience.category.desc())).all()
 
     except NoSuchTableError as nste:
-        print('exception:', str(nste))
-    except Exception as e:
-        print('exception:', str(e))
+        logger.warning('dashboard DB table missing: %s', nste)
+
+    except Exception:
+        logger.exception('admin_dashboard(): unexpected error')
 
     return render_template('admin_dashboard.html',
                            admins=admins(),
@@ -343,17 +405,19 @@ def manage_users():
     Returns:
       - render_template('admin_users.html', users=all_users, ...)
     """
+
     try:
-        all_users = db.session.scalars(
+        all_users: Sequence[User] = db.session.scalars(
             select(User).order_by(User.username)).all()
 
     except (NoSuchTableError, DatabaseError) as db_err:
-        print('manage_users DB error:', str(db_err))
+        logger.error('manage_users DB error: %s', db_err)
         flash('Database not ready!',
               category='error')
         all_users = []
-    except Exception as e:
-        print('manage_users unexpected error:', str(e))
+
+    except Exception:
+        logger.exception('manage_users unexpected error')
         all_users = []
 
     return render_template('admin_users.html',
@@ -376,11 +440,13 @@ def promote_user(user_id: int):
       - Redirect back to referring page or manage_users.
       - Flashes success or error messages on DB failure.
     """
+
     try:
-        user = db.session.get(User, user_id)
+        user: Optional[User] = db.session.get(User, user_id)
         if not user:
             flash('User not found!', category='danger')
             return redirect(request.referrer or url_for('manage_users'))
+
         if user.is_admin:
             flash('User is already an admin', category='info')
             return redirect(request.referrer or url_for('manage_users'))
@@ -390,11 +456,12 @@ def promote_user(user_id: int):
         flash(f'User {user.username} promoted to admin', category='success')
 
     except (OperationalError, DatabaseError) as db_err:
-        print('promote_user DB error:', str(db_err))
+        logger.error('promote_user DB error: %s', db_err)
         flash('Database error while promoting user', category='error')
         db.session.rollback()
-    except Exception as e:
-        print('promote_user unexpected error:', str(e))
+
+    except Exception:
+        logger.exception('promote_user unexpected error')
         flash('Failed to promote user', category='error')
         db.session.rollback()
 
@@ -415,17 +482,22 @@ def home():
     team_members = []
     clients = []
     try:
-        team_members = db.session.scalars(
+        team_members: Sequence[Team] = db.session.scalars(
             select(Team).order_by(Team.member_name.desc())).all()
 
-        clients = db.session.scalars(
+        clients: Sequence[Clients] = db.session.scalars(
             select(Clients).order_by(Clients.client_name.desc())
         ).all()
 
     except NoSuchTableError as nste:
-        print('exception:', str(nste))
-    except Exception as e:
-        print('exception:', str(e))
+        logger.warning('home: DB table missing: %s', nste)
+        team_members = []
+        clients = []
+
+    except Exception:
+        logger.exception('home unexpected exception')
+        team_members = []
+        clients = []
 
     return render_template('index.html',
                            whatsapp=environ.get('WHATSAPP'),
@@ -449,11 +521,12 @@ def add_member():
     Returns:
       - On GET or validation failure: render add-member template.
     """
+
     form = TeamForm()
 
     if form.validate_on_submit():
         try:
-            team_member = Team(
+            team_member: Team = Team(
                 member_name=form.member_name.data,
                 role=form.role.data,
                 portfolio_link=form.portfolio_link.data,
@@ -462,18 +535,21 @@ def add_member():
             db.session.add(team_member)
             db.session.commit()
             flash('New member added!', category='success')
+
             return redirect(request.args.get('next') or url_for('dashboard'))
 
         except IntegrityError as ie:
-            print('exception:', str(ie))
+            logger.warning('add_member IntegrityError: %s', ie)
             flash('Portfolio link or github account link already exist! \
             ...Verify if you\'re not using someone\'s link as yours',
                   category='warning')
             db.session.rollback()
-        except Exception as e:
-            print('exception:', str(e))
+
+        except Exception:
+            logger.exception('add_member unexpected error')
             flash('Failed to add new member!', category='error')
             db.session.rollback()
+
             return redirect(request.url or url_for('dashboard'))
 
     return render_template('add-member.html',
@@ -498,13 +574,15 @@ def update_member_profile(member_id: int):
       - On success: redirect to dashboard (or next param)
       - On failure: render add-member.html with form and flash messages
     """
+
     form = TeamForm()
 
-    member_to_update_profile = db.session.get(Team, member_id)
+    member_to_update_profile: Optional[Team] = db.session.get(Team, member_id)
 
     if not member_to_update_profile:
         flash('member does not exist', category='danger')
         next_url = request.args.get('next')
+
         return redirect(next_url or url_for('dashboard'))
 
     # populate fields correctly
@@ -522,17 +600,20 @@ def update_member_profile(member_id: int):
                     github_link=form.github_link.data)
             )
             db.session.commit()
+
             return redirect(request.args.get('next') or url_for('dashboard'))
 
         except IntegrityError as ie:
-            print('exception:', str(ie))
+            logger.warning('update_member_profile IntegrityError: %s', ie)
             flash('The updated portfolio link or github account link seems \
                 to exist already!',
                   category='warning')
             db.session.rollback()
-        except Exception as e:
-            print('exception:', str(e))
+
+        except Exception:
+            logger.exception('update_member_profile unexpected error')
             flash('Failed to update member!', category='error')
+
             return redirect(request.url or url_for('dashboard'))
 
     return render_template('add-member.html',
@@ -554,17 +635,20 @@ def delete_member(member_id: int):
     Returns:
       - Redirect to dashboard (or next param) with flash indicating result.
     """
-    member_to_delete = db.session.get(Team, member_id)
+
+    member_to_delete: Optional[Team] = db.session.get(Team, member_id)
 
     if not member_to_delete:
         flash('member does not exist', category='danger')
         next_url = request.args.get('next')
+
         return redirect(next_url or request.url or url_for('dashboard'))
 
     db.session.delete(member_to_delete)
     db.session.commit()
     flash('member deleted!', category='success')
     next_url = request.args.get('next') or url_for('dashboard')
+
     return redirect(next_url)
 
 
@@ -585,11 +669,12 @@ def add_client():
       - On success: redirect to dashboard (or next param)
       - On error: redirect back with flash
     """
+
     form = ClientForm()
 
     if form.validate_on_submit():
         try:
-            new_client = Clients(
+            new_client: Clients = Clients(
                 client_name=form.client_name.data,
                 profession=form.profession.data,
                 testimonial=form.testimonial.data
@@ -599,6 +684,7 @@ def add_client():
             if image.filename == '':
                 flash('No image selected!', category='danger')
                 # return redirect(request.url)
+
             if image and form.allowed_img_files(image.filename):
                 img_name: str = secure_filename(image.filename)
                 image.save(path.join(app.config['UPLOAD_FOLDER'], img_name))
@@ -610,16 +696,19 @@ def add_client():
             db.session.add(new_client)
             db.session.commit()
             flash('Client added!', category='success')
+
             return redirect(request.args.get('next') or url_for('dashboard'))
 
         except IntegrityError as ie:
-            print('exception', str(ie))
+            logger.warning('add_client IntegrityError: %s', ie)
             flash('Kindly rename the image...Current name already exist!')
             db.session.rollback()
-        except Exception as e:
-            print('exception', str(e))
+
+        except Exception:
+            logger.exception('add_client unexpected error')
             flash('Failed to add client!', category='error')
             db.session.rollback()
+
             return redirect(request.url or url_for('dashboard'))
 
     return render_template(
@@ -644,17 +733,20 @@ def delete_client(client_id: int):
       - Redirect to dashboard (or next param) with flash indicating
         success/error.
     """
-    client_to_delete = db.session.get(Clients, client_id)
+
+    client_to_delete: Optional[Clients] = db.session.get(Clients, client_id)
 
     if not client_to_delete:
         flash('client does not exist', category='danger')
         next_url = request.args.get('next')
+
         return redirect(next_url or request.url or url_for('dashboard'))
 
     db.session.delete(client_to_delete)
     db.session.commit()
     flash('client deleted!', category='success')
     next_url = request.args.get('next') or url_for('dashboard')
+
     return redirect(next_url)
 
 
@@ -676,13 +768,16 @@ def update_client_profile(client_id: int):
       - On validation or DB error: render add-client.html or redirect with
         flash
     """
+
     form = ClientForm()
 
-    client_to_update_profile = db.session.get(Clients, client_id)
+    client_to_update_profile: Optional[Clients] = db.session.get(Clients,
+                                                                 client_id)
 
     if not client_to_update_profile:
         flash('Project does not exist', category='danger')
         next_url = request.args.get('next')
+
         return redirect(next_url or url_for('dashboard'))
 
     form.client_name.data = client_to_update_profile.client_name
@@ -692,8 +787,10 @@ def update_client_profile(client_id: int):
     if form.validate_on_submit():
         img_name = None
         image = form.client_img.data
+
         if image and getattr(image, 'filename', '') == '':
             flash('No image selected!', category='danger')
+
         if image and form.allowed_img_files(image.filename):
             img_name: str = secure_filename(image.filename)
             image.save(path.join(app.config['UPLOAD_FOLDER'], img_name))
@@ -708,21 +805,25 @@ def update_client_profile(client_id: int):
                     client_name=form.client_name.data,
                     profession=form.profession.data,
                     testimonial=form.testimonial.data,
-                    client_img=updated_image or client_to_update_profile.client_img
+                    client_img=updated_image or
+                    client_to_update_profile.client_img
                 ))
             db.session.commit()
             flash('Updated successfully!', category='success')
+
             return redirect(request.args.get('next') or url_for('dashboard'))
 
         except IntegrityError as ie:
-            print('exception:', str(ie))
+            logger.warning('update_client_profile IntegrityError: %s', ie)
             flash('Kindly rename the image...Current name already exist!',
                   category='danger')
             db.session.rollback()
-        except Exception as e:
+
+        except Exception:
             flash('Failed to update client\'s profile!', 'error')
-            print('exception:', str(e))
+            logger.exception('update_client_profile unexpected error')
             db.session.rollback()
+
             return redirect(request.url or url_for('dashboard'))
 
     return render_template('add-client.html',
@@ -742,18 +843,21 @@ def skills():
     Returns:
       - render_template('skills.html', skills=..., experience=..., ...)
     """
-    try:
-        skills = db.session.scalars(
-            select(Skills).order_by(Skills.proficiency.desc())).all()
 
-        experience = db.session.scalars(
-            select(Experience).order_by(
-                Experience.end_year.desc())).all()
+    try:
+        skills: Sequence[Skills] = db.session.scalars(
+            select(Skills).order_by(Skills.proficiency.desc())
+        ).all()
+
+        experience: Sequence[Experience] = db.session.scalars(
+            select(Experience).order_by(Experience.end_year.desc())
+        ).all()
 
     except NoSuchTableError as nste:
-        print(f'exception: {str(nste)}')
-    except Exception as e:
-        print(f'exception: {str(e)}')
+        logger.warning('skills NoSuchTableError: %s', nste)
+
+    except Exception:
+        logger.exception('skills unexpected error')
 
     return render_template('skills.html',
                            skills=skills,
@@ -777,11 +881,12 @@ def add_skill():
       - On success: redirect to dashboard (or next param)
       - On failure: render add-skill.html with flash
     """
+
     form = SkillsForm()
 
     if form.validate_on_submit():
         try:
-            new_skill = Skills(
+            new_skill: Skills = Skills(
                 name=form.skill_name.data,
                 proficiency=form.proficiency.data if form.proficiency.data < 100 else int(
                     form.proficiency.data),
@@ -790,16 +895,19 @@ def add_skill():
             db.session.add(new_skill)
             db.session.commit()
             flash('Skill added!', category='success')
+
             return redirect(request.args.get('next') or url_for('dashboard'))
 
         except IntegrityError as ie:
-            print('exception:', str(ie))
+            logger.warning('add_skill IntegrityError: %s', ie)
             flash(f'{form.skill_name.data} already exist!', category='warning')
             db.session.rollback()
-        except Exception as e:
-            print('exception:', str(e))
+
+        except Exception:
+            logger.exception('add_skill unexpected error')
             flash('Failed to add new skill!...try again', category='error')
             db.session.rollback()
+
             return redirect(request.url or url_for('dashboard'))
 
     return render_template('add-skill.html',
@@ -824,13 +932,15 @@ def update_skill(skill_id: int):
       - On success: redirect to dashboard (or next param)
       - On error: redirect back with flash
     """
+
     form = SkillsForm()
 
-    skill_to_update = db.session.get(Skills, skill_id)
+    skill_to_update: Optional[Skills] = db.session.get(Skills, skill_id)
 
     if not skill_to_update:
         flash('Skill does not exist', category='danger')
         next_url = request.args.get('next')
+
         return redirect(next_url or url_for('dashboard'))
 
     form.skill_name.data = skill_to_update.name
@@ -842,10 +952,11 @@ def update_skill(skill_id: int):
                     proficiency=form.proficiency.data)
             )
             db.session.commit()
+
             return redirect(request.args.get('next') or url_for('dashboard'))
 
-        except Exception as e:
-            print('exception:', str(e))
+        except Exception:
+            logger.exception('update_skill unexpected error')
             flash('Failed to update skill!', category='error')
             return redirect(request.url or url_for('dashboard'))
 
@@ -868,17 +979,19 @@ def delete_skill(skill_id: int):
     Returns:
       - Redirect to dashboard with flash indicating result.
     """
-    skill_to_delete = db.session.get(Skills, skill_id)
+    skill_to_delete: Optional[Skills] = db.session.get(Skills, skill_id)
 
     if not skill_to_delete:
         flash('Skill does not exist', category='danger')
         next_url = request.args.get('next')
+
         return redirect(next_url or request.url or url_for('dashboard'))
 
     db.session.delete(skill_to_delete)
     db.session.commit()
     flash('Skill deleted!', category='success')
     next_url = request.args.get('next') or url_for('dashboard')
+
     return redirect(next_url)
 
 
@@ -897,11 +1010,12 @@ def add_experience():
       - On success: redirect to dashboard (or next param)
       - On failure: redirect back with flash
     """
+
     form = ExperienceForm()
 
     if form.validate_on_submit():
         try:
-            new_experience = Experience(
+            new_experience: Experience = Experience(
                 category=form.category.data,
                 role=form.role.data,
                 start_year=form.start_year.data,
@@ -912,13 +1026,15 @@ def add_experience():
             db.session.add(new_experience)
             db.session.commit()
             flash('New Experience added!', category='success')
+
             return redirect(request.args.get('next') or url_for('dashboard'))
 
-        except Exception as e:
-            print('exception:', str(e))
+        except Exception:
+            logger.exception('add_experience unexpected error')
             flash('Failed to add new experience!...try again',
                   category='error')
             db.session.rollback()
+
             return redirect(request.url or url_for('dashboard'))
 
     return render_template('add-experience.html',
@@ -940,17 +1056,20 @@ def delete_experience(experience_id: int):
     Returns:
       - Redirect to dashboard with flash indicating result.
     """
-    experience_to_delete = db.session.get(Experience, experience_id)
+    experience_to_delete: Optional[Experience] = db.session.get(Experience,
+                                                                experience_id)
 
     if not experience_to_delete:
         flash('No such experience!', category='danger')
         next_url = request.args.get('next')
+
         return redirect(next_url or request.url or url_for('dashboard'))
 
     db.session.delete(experience_to_delete)
     db.session.commit()
     flash('Experience deleted!', category='success')
     next_url = request.args.get('next') or url_for('dashboard')
+
     return redirect(next_url)
 
 
@@ -965,15 +1084,17 @@ def projects():
     Returns:
       - render_template('projects.html', all_projects=all_projects, ...)
     """
+
     try:
-        all_projects = db.session.scalars(
+        all_projects: Sequence[Projects] = db.session.scalars(
             select(Projects).order_by(Projects.created_at)
         ).all()
 
     except (NoSuchTableError, DatabaseError) as db_err:
-        print('DB exception (all_projects):', str(db_err))
-    except Exception as e:
-        print('exception:', str(e))
+        logger.warning('DB exception (all_projects): %s', db_err)
+
+    except Exception:
+        logger.exception('all_projects(): unexpected error')
 
     return render_template('projects.html',
                            admins=admins(),
@@ -997,6 +1118,7 @@ def add_project():
       - On success: redirect to dashboard (or next param)
       - On failure: render add-project.html or redirect with flash
     """
+
     form = Project()
 
     if form.validate_on_submit():
@@ -1014,12 +1136,16 @@ def add_project():
                 version=form.current_version.data,
                 suipjhaps=current_user
             )
+
             if form.created_at.data:
                 project.created_at = form.created_at.data
+
             if form.github_stars:
                 project.github_stars = form.github_stars.data
+
             if form.responsive.data:
                 project.responsive = form.responsive.data
+
             if form.is_live:
                 project.is_live = form.is_live
 
@@ -1033,13 +1159,17 @@ def add_project():
 
             if 'file_name' not in request.files or \
                     not isinstance(
-                        request.files.get('file_name'), FileStorage):
+                        request.files.get('file_name'), FileStorage
+                    ):
                 flash('No file part!', category='danger')
                 return redirect(request.url)
+
             file = request.files.get('file_name') or form.file_name.data
+
             if file.filename == '':
                 flash('No file selected!', category='danger')
                 # return redirect(request.url)
+
             if file and form.allowed_img_files(file.filename):
                 filename: str = secure_filename(file.filename)
                 file.save(path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -1050,17 +1180,19 @@ def add_project():
             db.session.add(project)
             db.session.commit()
             flash('Project added!', category='success')
-            redirect(request.args.get('next') or url_for('dashboard'))
+            return redirect(request.args.get('next') or url_for('dashboard'))
 
         except IntegrityError as ie:
-            print('exception:', str(ie))
+            logger.warning('add_project IntegrityError: %s', ie)
             flash('Project URL or Github URL or Demo URL exist already',
                   category='error')
             db.session.rollback()
-        except Exception as e:
-            flash('Failed to add project', 'error')
-            print('exception:', str(e))
+
+        except Exception:
+            logger.exception('add_project unexpected error')
+            flash('Failed to add project...', 'error')
             db.session.rollback()
+
             return redirect(request.url or url_for('dashboard'))
 
     return render_template('add-project.html',
@@ -1082,17 +1214,21 @@ def delete_project(project_id: int):
     Returns:
       - Redirect to dashboard with flash indicating result.
     """
-    project_to_delete = db.session.get(Projects, project_id)
+
+    project_to_delete: Optional[Projects] = db.session.get(Projects,
+                                                           project_id)
 
     if not project_to_delete:
         flash('Project does not exist', category='danger')
         next_url = request.args.get('next')
+
         return redirect(next_url or request.url or url_for('dashboard'))
 
     db.session.delete(project_to_delete)
     db.session.commit()
     flash('Project deleted!', category='success')
-    next_url = request.args.get('next') or url_for('dashboard')
+    next_url: str = request.args.get('next') or url_for('dashboard')
+
     return redirect(next_url)
 
 
@@ -1112,13 +1248,16 @@ def update_project(project_id: int):
       - On success: redirect to dashboard (or next param)
       - On error: render add-project.html or redirect with flash
     """
+
     form = Project()
 
-    project_to_update = db.session.get(Projects, project_id)
+    project_to_update: Optional[Projects] = db.session.get(Projects,
+                                                           project_id)
 
     if not project_to_update:
         flash('Project does not exist', category='danger')
-        next_url = request.args.get('next')
+        next_url: Optional[str] = request.args.get('next')
+
         return redirect(next_url or request.url or url_for('dashboard'))
 
     # populating with existing db details using .data
@@ -1137,6 +1276,7 @@ def update_project(project_id: int):
         img_name = None
         filename = None
         image = form.image.data
+
         if image and form.allowed_img_files(image.filename):
             img_name: str = secure_filename(image.filename)
             image.save(path.join(app.config['UPLOAD_FOLDER'], img_name))
@@ -1148,9 +1288,12 @@ def update_project(project_id: int):
                 request.files.get('file_name'), FileStorage):
             flash('No file part!', category='danger')
             return redirect(request.url)
+
         file = request.files.get('file_name') or form.file_name.data
+
         if getattr(file, 'filename', '') == '':
             flash('No file selected!', category='danger')
+
         if file and form.allowed_img_files(file.filename):
             filename: str = secure_filename(file.filename)
             file.save(path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -1164,14 +1307,16 @@ def update_project(project_id: int):
                 ).values(
                     title=form.title.data,
                     category=form.category.data or project_to_update.category,
-                    description=form.description.data or project_to_update.description,
+                    description=form.description.data or
+                    project_to_update.description,
                     demo_url=form.demo_url.data,
                     github_url=form.github_url.data,
                     current_version=form.current_version.data,
                     tech_stack=form.tech_stack.data,
                     image=updated_image or project_to_update.image,
                     file_name=updated_file_name or project_to_update.file_name,
-                    responsive=form.responsive.data or project_to_update.responsive,
+                    responsive=form.responsive.data or
+                    project_to_update.responsive,
                     github_stars=form.github_stars.data,
                     platform=form.platform.data,
                     is_live=form.is_live.data or project_to_update.is_live,
@@ -1182,17 +1327,18 @@ def update_project(project_id: int):
             )
             db.session.commit()
             flash('Updated successfully!', category='success')
+
             return redirect(request.args.get('next') or url_for('dashboard'))
 
         except IntegrityError as ie:
-            print('exception:', str(ie))
+            logger.warning('update_project IntegrityError: %s', ie)
             flash('Project URL or Github URL or Demo URL exist already',
                   category='error')
             db.session.rollback()
 
-        except Exception as e:
+        except Exception:
+            logger.exception('update_project unexpected error')
             flash('Failed to update project!', 'error')
-            print('exception:', str(e))
             db.session.rollback()
             return redirect(request.url or url_for('dashboard'))
 
@@ -1213,6 +1359,7 @@ def services():
     Returns:
       - render_template('services.html', ...)
     """
+
     return render_template('services.html',
                            whatsapp=environ.get('WHATSAPP'),
                            admins=admins(),
@@ -1220,7 +1367,7 @@ def services():
 
 
 @app.route('/about')
-def about():
+def about():  # sourcery skip: for-index-underscore
     """
     About page: compute project & client counts and render about.html.
 
@@ -1230,6 +1377,7 @@ def about():
     Returns:
       - render_template('about.html', projects_num=int, clients_num=int, ...)
     """
+
     number_of_projects: int = 0
     number_of_clients: int = 0
 
@@ -1241,9 +1389,10 @@ def about():
             select(Clients)).all()
 
     except (NoSuchTableError, DatabaseError) as db_err:
-        print('DB exception (no_of_projects):', str(db_err))
-    except Exception as e:
-        print('exception (no_of_projects):', str(e))
+        logger.warning('DB exception (no_of_projects): %s', db_err)
+
+    except Exception:
+        logger.exception('no_of_projects(): unexpected error')
 
     else:
         if all_projects:
@@ -1275,12 +1424,13 @@ def contact_form():
       - On GET or failure: render_template('contact.html', form=form, ...)
       - On success: render_template('contact.html', is_sent=True, ...)
     """
+
     form = ContactForm()
 
     if form.validate_on_submit():
         email: str = form.email.data
         name: str = form.name.data
-        subject: str | None = form.subject.data
+        subject: Optional[str] = form.subject.data
         message: str = form.message.data
 
         try:
@@ -1297,8 +1447,11 @@ def contact_form():
                 mail_server.send_message(mail)
 
         except ConnectionError:
+            logger.warning('contact_form(): ConnectionError')
             flash('Could not connect to email servers! Try resending', 'error')
+
         except Exception:
+            logger.exception('contact_form(): unexpected error')
             flash('Failed to send message!', 'error')
             return redirect(url_for('contact_form'))
 
@@ -1334,6 +1487,7 @@ def read_more():
     Returns:
       - render_template('read-more.html', ...)
     """
+
     return render_template('read-more.html',
                            admins=admins(),
                            year=datetime.now().year,
@@ -1357,11 +1511,14 @@ def download_cv(cv):
       - send_from_directory(..., as_attachment=True) on success.
       - abort(404) if file not found.
     """
+
     try:
         return send_from_directory(
             app.config['UPLOAD_FOLDER'], cv, as_attachment=True
         )
+
     except FileNotFoundError:
+        logger.warning('download_cv(): FileNotFoundError for %s', cv)
         abort(404)
 
 
@@ -1376,6 +1533,7 @@ def logout():
     Returns:
       - Redirect to home or next parameter.
     """
+
     if current_user.is_authenticated:
         logout_user()
         return redirect(request.args.get('next') or url_for('home'))
