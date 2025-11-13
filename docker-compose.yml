@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: suiper
+      POSTGRES_PASSWORD: jhaptechinc5566
+      POSTGRES_DB: jhaps_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U suiper"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      # use docker-network host for DB service (compose DNS name = db)
+      DATABASE_URI: postgresql+psycopg2://suiper:jhaptechinc5566@db:5432/jhaps_db
+      FLASK_APP: app.py
+      FLASK_ENV: development
+      SECRET_KEY: "my-highly-swcure-development-secret-key"
+      LOG_LEVEL: INFO
+      PORT: 8000
+    volumes:
+      - ./:/home/appuser/app # optional: live-edit in container for dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
