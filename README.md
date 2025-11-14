@@ -205,6 +205,33 @@ A personal portfolio / admin CMS built with Flask, SQLAlchemy and Bootstrap.
 
 ---
 
+## 🧪 Testing
+
+- Tests use pytest. They run with an in-memory SQLite DB and a temporary uploads folder.
+- **Install pytest**:
+
+  ```bash
+  pip install pytest
+  ```
+
+- **Run tests**:
+
+  ```bash
+  pytest -q
+  ```
+
+- **What is covered**:
+  - tests/test_models.py — basic model CRUD and password hashing
+  - tests/test_routes.py — public routes, signup/login flow and contact form (SMTP mocked)
+  - tests/test_forms.py — form helper methods and field availability
+
+### Notes
+
+- Tests disable CSRF and use a fresh in-memory DB so they are fast and isolated.
+- If you add new models or required fixtures, extend tests/conftest.py accordingly.
+
+---
+
 ## ⚙️ Environment variables
 
 - SECRET_KEY — strong random secret (in .env)
@@ -266,7 +293,7 @@ See `.env.sample` for the full list.
 
 ## 🧾 License
 
-- This project is released under the MIT License. See [`LICENSE`](https://github.com/Suiper34) for details.
+- This project is released under the MIT License. See [`LICENSE`](./LICENSE) for details.
 
 ---
 
