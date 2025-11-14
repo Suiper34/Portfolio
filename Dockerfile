@@ -19,7 +19,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ---- app user for non-root runtime ----
 RUN useradd --create-home appuser
 WORKDIR /home/appuser/app
-USER appuser
 
 # copy only requirements first (leverages cache)
 COPY --chown=appuser:appuser requirements.txt ./
@@ -44,7 +43,10 @@ ENV FLASK_APP=app.py \
     FLASK_ENV=production \
     PORT=8000
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=5 CMD curl -f http://localhost:${PORT}/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=5 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+USER appuser
 
 # use Gunicorn to serve the app in production
 # - use a threaded worker class
