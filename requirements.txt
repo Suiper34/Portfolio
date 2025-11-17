@@ -13,3 +13,4 @@ bleach==6.2.0  # for deployment
 email_validator==2.2.0
 Flask-Migrate==4.1.0
 redis==6.4.0
+openai>=1.50.0
