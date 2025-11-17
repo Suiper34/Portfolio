@@ -1,23 +1,28 @@
+from __future__ import annotations
+
 import logging
 import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
-from functools import wraps
+from functools import _Wrapped, wraps
+from hashlib import sha256
 from logging.handlers import RotatingFileHandler
 from os import environ, makedirs, path, urandom
 from pathlib import Path
-from typing import Optional, Sequence
+from re import compile, sub
+from typing import Any, List, Optional, Sequence
 
 from dotenv import load_dotenv
 from flask import (Flask, abort, flash, jsonify, redirect, render_template,
                    request, send_from_directory, url_for)
 # from flask_admin import Admin
 from flask_bootstrap import Bootstrap5
+from flask_caching import Cache
 from flask_login import (LoginManager, current_user, login_required, login_url,
                          login_user, logout_user)
 from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import (DatabaseError, IntegrityError, NoSuchTableError,
                             OperationalError)
 from werkzeug.datastructures import FileStorage
@@ -47,6 +52,11 @@ upload_dir.mkdir(parents=True, exist_ok=True)
 
 
 def resolve_secret_key() -> str:
+    """
+    Return a deterministic secret key from env vars or generate a random
+    fallback.
+    """
+
     for candidate in (
         environ.get('SECRET_KEY'),
         environ.get('FLASK_SECRET_KEY'),
@@ -59,6 +69,10 @@ def resolve_secret_key() -> str:
 
 
 def resolve_database_uri() -> str:
+    """
+    Resolve the SQLAlchemy database URI from environment fallbacks.
+    """
+
     return (
         environ.get('DATABASE_URI')
         or environ.get('DB_URI_DOCKER')
@@ -66,12 +80,22 @@ def resolve_database_uri() -> str:
     )
 
 
+DEFAULT_CACHE_TYPE = 'RedisCache' if environ.get(
+    'REDIS_URL') else 'SimpleCache'
+CACHE_DEFAULT_TIMEOUT = int(environ.get('CACHE_DEFAULT_TIMEOUT', 300))
+ASSISTANT_CACHE_TTL = int(environ.get('ASSISTANT_CACHE_TTL', 600))
+ASSISTANT_SNAPSHOT_TTL = int(environ.get('ASSISTANT_SNAPSHOT_TTL', 120))
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = resolve_secret_key()
 app.config['FLASK_ADMIN_SWATCH'] = 'cyborg'
 app.config['SQLALCHEMY_DATABASE_URI'] = resolve_database_uri()
 app.config['UPLOAD_FOLDER'] = str(upload_dir)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # (100 mb)
+app.config['CACHE_DEFAULT_TIMEOUT'] = CACHE_DEFAULT_TIMEOUT,
+app.config['CACHE_TYPE'] = environ.get('CACHE_TYPE', DEFAULT_CACHE_TYPE),
+app.config['CACHE_REDIS_URL'] = environ.get('REDIS_URL',
+                                            'redis://redis:6379/0'),
 # admin = Admin(app, name='portfolio')
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -80,6 +104,16 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
+
+cache_config = {
+    'CACHE_TYPE': app.config['CACHE_TYPE'],
+    'CACHE_DEFAULT_TIMEOUT': CACHE_DEFAULT_TIMEOUT,
+}
+if cache_config['CACHE_TYPE'].lower() == 'rediscache':
+    cache_config['CACHE_REDIS_URL'] = app.config['CACHE_REDIS_URL']
+
+cache = Cache(config=cache_config)
+cache.init_app(app)
 
 LOG_LEVEL = environ.get('LOG_LEVEL', 'INFO').upper()
 
@@ -136,7 +170,110 @@ with app.app_context():
         )
 
 
-def admins_only(func):
+ASSISTANT_SUGGESTIONS: List[str] = [
+    'How do I explore your projects?',
+    'How can I contact the team?',
+    'What can admins do on this site?',
+    'Where do uploads go?',
+]
+
+ASSISTANT_PATTERNS: list = [
+    (
+        compile(r'\b(project|portfolio|case study|case-study)\b'),
+        lambda stats: (
+            'You can browse the portfolio via **My Projects** in the top menu '
+            'or from the homepage. Right now we have '
+            f'{stats.get("project_count", 0)} published project(s). '
+            'Each entry includes tech stack details, links, and \
+                optional assets.'
+        ),
+    ),
+    (
+        compile(r'\b(contact|email|reach|message)\b'),
+        lambda stats: (
+            'We love hearing from visitors! Use the **Contact** page to send '
+            'a message or drop us an email at the address configured '
+            'in the contact form. There\'s also a WhatsApp shortcut in the\
+                footer for quick chats.'
+        ),
+    ),
+    (
+        compile(r'\b(admin|dashboard|manage|cms)\b'),
+        lambda stats: (
+            'Admins can log in to the dashboard to manage projects, clients,'
+            ' team members, skills, and experiences.'
+            ' Promote users from the **Users** tab and every change is tracked\
+                via the database migrations.'
+        ),
+    ),
+    (
+        compile(r'\b(upload|resume|file|download)\b'),
+        lambda stats: (
+            'Uploaded assets are stored under `static/files`. '
+            'When you add clients or projects, approved image formats are '
+            'validated and stored safely. Visitors can download files through \
+                secure endpoints.'
+        ),
+    ),
+]
+
+
+def _normalise_query(text: str) -> str:
+    """Collapse whitespace and lowercase queries to stabilize cache keys."""
+    return sub(r'\s', ' ', text.strip().lower())
+
+
+def _assistant_cache_key(query: str) -> str:
+    """Build a deterministic cache key for an assistant answer."""
+
+    digest: str = sha256(_normalise_query(
+        query).encode('utf-8')).hexdigest()
+
+    return f'assistant:response:{digest}'
+
+
+def get_site_snapshot() -> dict:
+    """Return cached aggregate stats used for contextual assistant prompts."""
+
+    cache_key = 'assistant:site_snapshot'
+    cached_snapshot = cache.get(cache_key)
+
+    if cached_snapshot is not None:
+        return cached_snapshot
+
+    snapshot = {
+        'project_count': 0,
+        'client_count': 0,
+        'team_count': 0,
+    }
+
+    try:
+        snapshot['project_count'] = db.session.scalar(
+            select(func.count()).select_from(Projects)
+        ) or 0
+        snapshot['client_count'] = db.session.scalar(
+            select(func.count()).select_from(Clients)
+        ) or 0
+        snapshot['team_count'] = db.session.scalar(
+            select(func.count()).select_from(Team)
+        ) or 0
+
+    except NoSuchTableError as missing_table:
+        logger.debug(
+            'assistant snapshot skipped (missing table): %s', missing_table)
+
+    except DatabaseError as db_err:
+        logger.warning('assistant snapshot DB issue: %s', db_err)
+
+    except Exception:
+        logger.exception('assistant snapshot unexpected error')
+
+    cache.set(cache_key, snapshot, timeout=ASSISTANT_SNAPSHOT_TTL)
+
+    return snapshot
+
+
+def admins_only(func) -> _Wrapped[..., Any, ..., Any]:
     """
     Decorator: allow only admin users.
 
@@ -145,6 +282,7 @@ def admins_only(func):
 
     Side effects: reads the User table. Returns decorated view or aborts.
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
 
@@ -170,6 +308,7 @@ def admins_only(func):
             return abort(403)
 
         return func(*args, **kwargs)
+
     return wrapper
 
 
