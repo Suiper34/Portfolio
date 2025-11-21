@@ -10,7 +10,7 @@ from logging.handlers import RotatingFileHandler
 from os import environ, makedirs, path, urandom
 from pathlib import Path
 from re import compile, sub
-from typing import Any, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from dotenv import load_dotenv
 from flask import (Flask, abort, flash, jsonify, redirect, render_template,
@@ -232,7 +232,7 @@ def _assistant_cache_key(query: str) -> str:
     return f'assistant:response:{digest}'
 
 
-def get_site_snapshot() -> dict:
+def get_site_snapshot() -> Dict[str, int]:
     """Return cached aggregate stats used for contextual assistant prompts."""
 
     cache_key = 'assistant:site_snapshot'
@@ -271,6 +271,59 @@ def get_site_snapshot() -> dict:
     cache.set(cache_key, snapshot, timeout=ASSISTANT_SNAPSHOT_TTL)
 
     return snapshot
+
+
+def compose_assistant_prompt(stats: Dict[str, int]) -> str:
+    """Compose a resilient system prompt grounded in live portfolio stats."""
+
+    prompt_lines: List[str] = [
+        'You are JhapsTech\'s helpful AI assistant. Answer with concise '
+        'markdown (≤150 words) and always ground replies in the portfolio \
+            context below.',
+        f'- Published projects: {stats.get("project_count", 0)}',
+        f'- Featured clients: {stats.get("client_count", 0)}',
+        f'- Active team members: {stats.get("team_count", 0)}',
+
+        'Encourage users to explore the site \
+            (Home, My Projects, Services, Skills, Contact, About) and remind \
+                admins they must log in for dashboard actions when relevant.',
+    ]
+
+    for pattern, handler in ASSISTANT_PATTERNS:
+        prompt_lines.append(
+            f'If a query matches pattern `{pattern.pattern}`, \
+                lean on this guidance: {handler(stats)}'
+        )
+
+    prompt_lines.append(
+        'Never invent data. When unsure, invite the user to explore the \
+            Contact page or the portfolio sections.'
+    )
+
+    return '\n'.join(prompt_lines)
+
+
+def heuristic_assistant_reply(stats: Dict[str, int], query: str):
+    """
+    Return a deterministic fallback answer when the AI backend is unavailable.
+    """
+
+    normalised: str = _normalise_query(query)
+
+    for pattern, handler in ASSISTANT_PATTERNS:
+        if pattern.search(normalised):
+            return handler(stats)
+
+    return (
+        'Here’s how to get around:\n'
+        '- **Home** lists current team  client highlights '
+        f'({stats.get("team_count", 0)} member(s), \
+            {stats.get("client_count", 0)} client story/stories).\n'
+        '- **My Projects** has detailed case studies.\n'
+        '- **Contact** lets you reach me (email, WhatsApp, socials).\n'
+        '- Admins can log in for dashboard controls.\n\n'
+        'Ask about projects, uploads, admin tools, or how to get in touch!'
+    )
 
 
 def admins_only(func) -> _Wrapped[..., Any, ..., Any]:
