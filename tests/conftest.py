@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from os import environ
 from shutil import rmtree
 from typing import Any, Generator
-
 import pytest
 from _pytest.tmpdir import TempPathFactory
 from flask import Flask
