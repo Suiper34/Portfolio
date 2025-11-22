@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from forms.projects_form import Project
 from forms.clients_form import ClientForm
 
