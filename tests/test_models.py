@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from app import db
 from models.admin import User
 from models.clients import Clients
