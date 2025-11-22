@@ -1,4 +1,5 @@
-import shutil
+from os import environ
+from shutil import rmtree
 from typing import Any, Generator
 
 import pytest
@@ -7,7 +8,20 @@ from flask import Flask
 from flask.testing import FlaskClient, FlaskCliRunner
 
 from app import app as flask_app
+from app import cache as app_cache
 from app import db as _db
+
+# force simple cache + disable redis before the app module imports.
+environ.setdefault('CACHE_TYPE', 'SimpleCache')
+environ.setdefault('REDIS_URL', '')
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    app_cache.clear()
+    app.config['TESTING'] = True
+    yield
+    app_cache.clear()
 
 
 @pytest.fixture(scope='session')
@@ -18,7 +32,7 @@ def temp_upload_dir(
 
     a_dir = tmp_path_factory.mktemp('uploads')
     yield str(a_dir)
-    shutil.rmtree(str(a_dir), ignore_errors=True)
+    rmtree(str(a_dir), ignore_errors=True)
 
 
 @pytest.fixture(scope='session')
