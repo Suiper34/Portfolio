@@ -13,8 +13,8 @@ from re import compile, sub
 from typing import Any, Dict, List, Optional, Sequence
 
 from dotenv import load_dotenv
-from flask import (Flask, abort, flash, jsonify, redirect, render_template,
-                   request, send_from_directory, url_for)
+from flask import (Flask, Response, abort, flash, jsonify, redirect,
+                   render_template, request, send_from_directory, url_for)
 # from flask_admin import Admin
 from flask_bootstrap import Bootstrap5
 from flask_caching import Cache
@@ -43,6 +43,7 @@ from models.experience import Experience
 from models.projects import Projects
 from models.skills import Skills
 from models.team import Team
+from services.ai_client import AssistantClientError, jhaptech_assistant_client
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env')
@@ -303,7 +304,7 @@ def compose_assistant_prompt(stats: Dict[str, int]) -> str:
     return '\n'.join(prompt_lines)
 
 
-def heuristic_assistant_reply(stats: Dict[str, int], query: str):
+def heuristic_assistant_reply(stats: Dict[str, int], query: str) -> str:
     """
     Return a deterministic fallback answer when the AI backend is unavailable.
     """
@@ -324,6 +325,26 @@ def heuristic_assistant_reply(stats: Dict[str, int], query: str):
         '- Admins can log in for dashboard controls.\n\n'
         'Ask about projects, uploads, admin tools, or how to get in touch!'
     )
+
+
+def build_assistant_reply() -> Response | tuple:
+    try:
+        stats: Dict[str, int] = get_site_snapshot()
+        system_prompt: str = compose_assistant_prompt(stats)
+        user_query: Optional[Any] = request.json.get('query', '')
+
+        response: str = jhaptech_assistant_client.generate(system_prompt,
+                                                           user_query)
+        return jsonify({'response': response})
+
+    except AssistantClientError:
+        # fallback to heuristic response
+        fallback_response: str = heuristic_assistant_reply(stats, user_query)
+        return jsonify({'response': fallback_response})
+
+    except Exception as e:
+        logger.error('Assistant query failed: %s', e)
+        return jsonify({'error': 'Assistant service unavailable!'}), 503
 
 
 def admins_only(func) -> _Wrapped[..., Any, ..., Any]:
@@ -388,7 +409,7 @@ def admins() -> Sequence[User]:
 
 
 @login_manager.user_loader
-def load_user(user_id):
+def load_user(user_id) -> Optional[User]:
     """
     Flask-Login user loader.
 
@@ -420,7 +441,7 @@ def health() -> tuple:
 
 
 @app.route('/sign-up', methods=['POST', 'GET'])
-def signup():
+def signup() -> Response | str:
     """
     Create a new user account and log them in.
 
@@ -492,7 +513,7 @@ def signup():
 
 
 @app.route('/login', methods=['POST', 'GET'])
-def login():
+def login() -> Response | str:
     """
     Authenticate user by username or email and password.
 
@@ -571,7 +592,7 @@ def login():
 @app.route('/admin-dashboard')
 @login_required
 @admins_only
-def dashboard():
+def dashboard() -> Response | str:
     """
     Render admin dashboard with aggregated resources.
 
@@ -628,7 +649,7 @@ def dashboard():
 @app.route('/admin-dashboard/users')
 @login_required
 @admins_only
-def manage_users():
+def manage_users() -> str:
     """
     List all users for admin management.
 
@@ -662,7 +683,7 @@ def manage_users():
 @app.route('/admin-dashboard/promote-user/<int:user_id>', methods=['POST'])
 @login_required
 @admins_only
-def promote_user(user_id: int):
+def promote_user(user_id: int) -> Response:
     """
     Promote a user to admin (set is_admin=True).
 
@@ -702,7 +723,7 @@ def promote_user(user_id: int):
 
 
 @app.route('/')
-def home():
+def home() -> str:
     """
     Home page: load team members and clients.
 
@@ -743,7 +764,7 @@ def home():
 @app.route('/admin-dashboard/add-member', methods=['POST', 'GET'])
 @login_required
 @admins_only
-def add_member():
+def add_member() -> Response | str:
     """
     Add a team member (admin only).
 
@@ -795,7 +816,7 @@ def add_member():
            methods=['POST', 'GET'])
 @login_required
 @admins_only
-def update_member_profile(member_id: int):
+def update_member_profile(member_id: int) -> Response | str:
     """
     Update an existing team member (admin only).
 
@@ -858,7 +879,7 @@ def update_member_profile(member_id: int):
 @app.route('/admin-dashboard/delete-member/<int:member_id>')
 @login_required
 @admins_only
-def delete_member(member_id: int):
+def delete_member(member_id: int) -> Response:
     """
     Delete a team member by id (admin only).
 
@@ -888,7 +909,7 @@ def delete_member(member_id: int):
 @app.route('/admin-dashboard/add-client', methods=['POST', 'GET'])
 @login_required
 @admins_only
-def add_client():
+def add_client() -> Response | str:
     """
     Add a client with optional image upload (admin only).
 
@@ -955,7 +976,7 @@ def add_client():
 @app.route('/admin-dashboard/delete-client/<int:client_id>')
 @login_required
 @admins_only
-def delete_client(client_id: int):
+def delete_client(client_id: int) -> Response:
     """
     Delete a client by id (admin only).
 
@@ -987,7 +1008,7 @@ def delete_client(client_id: int):
            methods=['POST', 'GET'])
 @login_required
 @admins_only
-def update_client_profile(client_id: int):
+def update_client_profile(client_id: int) -> Response | str:
     """
     Update a client's profile and image (admin only).
 
@@ -1066,7 +1087,7 @@ def update_client_profile(client_id: int):
 
 
 @app.route('/skills')
-def skills():
+def skills() -> str:
     """
     Skills page: returns skills and experience ordered for display.
 
@@ -1102,7 +1123,7 @@ def skills():
 @app.route('/admin-dashboard/add-skill', methods=['POST', 'GET'])
 @login_required
 @admins_only
-def add_skill():
+def add_skill() -> Response | str:
     """
     Add a skill (admin only).
 
@@ -1153,7 +1174,7 @@ def add_skill():
            methods=['POST', 'GET'])
 @login_required
 @admins_only
-def update_skill(skill_id: int):
+def update_skill(skill_id: int) -> Response | str:
     """
     Update a skill's proficiency (admin only).
 
@@ -1202,7 +1223,7 @@ def update_skill(skill_id: int):
 @app.route('/admin-dashboard/delete-skills/<int:skill_id>')
 @login_required
 @admins_only
-def delete_skill(skill_id: int):
+def delete_skill(skill_id: int) -> Response:
     """
     Delete a skill by id (admin only).
 
@@ -1231,7 +1252,7 @@ def delete_skill(skill_id: int):
 @app.route('/admin-dashboard/add-new-experience', methods=['POST', 'GET'])
 @login_required
 @admins_only
-def add_experience():
+def add_experience() -> Response | str:
     """
     Add an experience record (admin only).
 
@@ -1279,7 +1300,7 @@ def add_experience():
 @app.route('/admin-dashboard/delete-experience/<int:experience_id>')
 @login_required
 @admins_only
-def delete_experience(experience_id: int):
+def delete_experience(experience_id: int) -> Response:
     """
     Delete an experience record (admin only).
 
@@ -1307,7 +1328,7 @@ def delete_experience(experience_id: int):
 
 
 @app.route('/my-projects')
-def projects():
+def projects() -> str:
     """
     Render read-only projects listing for public visitors.
 
@@ -1338,7 +1359,7 @@ def projects():
 @app.route('/admin-dashboard/add-project', methods=['POST', 'GET'])
 @login_required
 @admins_only
-def add_project():
+def add_project() -> Response | str:
     """
     Create a new project (admin only).
 
@@ -1437,7 +1458,7 @@ def add_project():
 @app.route('/admin-dashboard/delete-project/<int:project_id>')
 @login_required
 @admins_only
-def delete_project(project_id: int):
+def delete_project(project_id: int) -> Response:
     """
     Delete a project by id (admin only).
 
@@ -1469,7 +1490,7 @@ def delete_project(project_id: int):
            methods=['POST', 'GET'])
 @login_required
 @admins_only
-def update_project(project_id: int):
+def update_project(project_id: int) -> Response | str:
     """
     Update an existing project and optionally replace files (admin only).
 
@@ -1582,7 +1603,7 @@ def update_project(project_id: int):
 
 
 @app.route('/services')
-def services():
+def services() -> str:
     """
     Render services page (public).
 
@@ -1600,7 +1621,7 @@ def services():
 
 
 @app.route('/about')
-def about():  # sourcery skip: for-index-underscore
+def about() -> str:
     """
     About page: compute project & client counts and render about.html.
 
@@ -1629,11 +1650,11 @@ def about():  # sourcery skip: for-index-underscore
 
     else:
         if all_projects:
-            for project in all_projects:
+            for _ in all_projects:
                 number_of_projects += 1
 
         if clients:
-            for client in clients:
+            for _ in clients:
                 number_of_clients += 1
 
     return render_template('about.html',
@@ -1644,7 +1665,7 @@ def about():  # sourcery skip: for-index-underscore
 
 
 @app.route('/contact-form', methods=['POST', 'GET'])
-def contact_form():
+def contact_form() -> Response | str:
     """
     Contact form: send email using SMTP_SSL (Gmail).
 
@@ -1710,7 +1731,7 @@ def contact_form():
 
 
 @app.route('/about/read-more')
-def read_more():
+def read_more() -> str:
     """
     Render a detailed 'read more about me' page.
 
@@ -1730,7 +1751,7 @@ def read_more():
 
 
 @app.route('/download-file/<path:cv>')
-def download_cv(cv):
+def download_cv(cv) -> Response:
     """
     Serve a file from UPLOAD_FOLDER as attachment.
 
@@ -1756,7 +1777,7 @@ def download_cv(cv):
 
 
 @app.route('/logging-out')
-def logout():
+def logout() -> Response:
     """
     Log out the current user and redirect to home (or next).
 
@@ -1773,4 +1794,8 @@ def logout():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(
+        host='0.0.0.0',
+        port=int(environ.get('PORT', 5000)),
+        debug=True
+    )
