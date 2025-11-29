@@ -327,6 +327,7 @@ def heuristic_assistant_reply(stats: Dict[str, int], query: str) -> str:
     )
 
 
+@app.route('/assistant/query-replies', methods=['POST'])
 def build_assistant_reply() -> Response | tuple:
     try:
         stats: Dict[str, int] = get_site_snapshot()
@@ -438,6 +439,19 @@ def health() -> tuple:
         status='ok',
         timestamp=datetime.now(timezone.utc).isoformat() + 'Z'
     ), 200
+
+
+@app.route('/assistant/chat', methods=['GET'])
+def jhaptech_assistant_chat():
+    """Render the AI assistant chat UI and surface prompt suggestions."""
+
+    return render_template(
+        'assistant_chat.html',
+        admins=admins(),
+        assistant_enabled=jhaptech_assistant_client.is_enabled(),
+        suggestions=ASSISTANT_SUGGESTIONS,
+        year=datetime.now().year,
+    )
 
 
 @app.route('/sign-up', methods=['POST', 'GET'])
