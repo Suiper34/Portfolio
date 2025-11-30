@@ -4,7 +4,7 @@ import logging
 import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
-from functools import _Wrapped, wraps
+from functools import wraps
 from hashlib import sha256
 from logging.handlers import RotatingFileHandler
 from os import environ, makedirs, path, urandom
@@ -348,7 +348,7 @@ def build_assistant_reply() -> Response | tuple:
         return jsonify({'error': 'Assistant service unavailable!'}), 503
 
 
-def admins_only(func) -> _Wrapped[..., Any, ..., Any]:
+def admins_only(func):
     """
     Decorator: allow only admin users.
 
