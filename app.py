@@ -454,6 +454,19 @@ def jhaptech_assistant_chat():
     )
 
 
+@app.route('/assistant', methods=['GET'])
+def assistant_info() -> tuple:
+    """
+    Describe how to use the assistant endpoint.
+    """
+    return jsonify(
+        message='POST JSON to /assistant with a \'query\' field to receive \
+            contextual help.',
+        example_payload={'query': 'How do I explore your projects?'},
+        suggestions=ASSISTANT_SUGGESTIONS,
+    ), 200
+
+
 @app.route('/sign-up', methods=['POST', 'GET'])
 def signup() -> Response | str:
     """
