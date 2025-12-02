@@ -328,11 +328,11 @@ def heuristic_assistant_reply(stats: Dict[str, int], query: str) -> str:
 
 
 @app.route('/assistant/query-replies', methods=['POST'])
-def build_assistant_reply() -> Response | tuple:
+def build_assistant_reply(user_query: Optional[str | Any]) -> Response | tuple:
     try:
         stats: Dict[str, int] = get_site_snapshot()
         system_prompt: str = compose_assistant_prompt(stats)
-        user_query: Optional[Any] = request.json.get('query', '')
+        user_query = request.json.get('query', '')
 
         response: str = jhaptech_assistant_client.generate(system_prompt,
                                                            user_query)
@@ -465,6 +465,30 @@ def assistant_info() -> tuple:
         example_payload={'query': 'How do I explore your projects?'},
         suggestions=ASSISTANT_SUGGESTIONS,
     ), 200
+
+
+@app.route('/assistant', methods=['POST'])
+def assistant_endpoint() -> tuple:
+    """
+    Respond to portfolio-related questions with cached AI (or heuristic)
+    answers.
+    """
+
+    payload: Any | dict = request.get_json(silent=True) or {}
+    query: str = (payload.get('query') or '').strip()
+
+    if not query:
+        return jsonify(error='query is required'), 400
+
+    cache_key: str = _assistant_cache_key(query)
+    cached_response = cache.get(cache_key)
+    if cached_response:
+        return jsonify(answer=cached_response, cached=True), 200
+
+    answer = build_assistant_reply(query)
+    cache.set(cache_key, answer, timeout=ASSISTANT_CACHE_TTL)
+
+    return jsonify(answer=answer, cached=False), 200
 
 
 @app.route('/sign-up', methods=['POST', 'GET'])
