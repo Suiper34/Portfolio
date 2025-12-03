@@ -1,6 +1,12 @@
 version: "3.8"
 
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
   db:
     image: postgres:15
     restart: unless-stopped
@@ -23,6 +29,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "${PORT:-8000}:8000"
     env_file:
@@ -35,6 +43,14 @@ services:
       SECRET_KEY: ${SECRET_KEY:-my-highly-secure-development-secret-key}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       PORT: ${PORT:-8000}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CACHE_TYPE: ${CACHE_TYPE:-RedisCache}
+      CACHE_DEFAULT_TIMEOUT: ${CACHE_DEFAULT_TIMEOUT:-300}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-gpt-4o-mini}
+      ASSISTANT_TEMPERATURE: ${ASSISTANT_TEMPERATURE:-0.4}
+      ASSISTANT_MAX_TOKENS: ${ASSISTANT_MAX_TOKENS:-600}
+      ASSISTANT_CACHE_TTL: ${ASSISTANT_CACHE_TTL:-600}
     volumes:
       - ./:/home/appuser/app # optional: live-edit in container for dev
     restart: unless-stopped
@@ -46,3 +62,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
